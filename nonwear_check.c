@@ -294,6 +294,7 @@ static float32_t _Covariance(const float32_t* x, const float32_t* y,
   return covariance;
 }
 
+/* TODO: 此函数的准确性需要再做一次验证. */
 static void _AggregateLinearTrend(float32_t* data, uint16_t data_length,
                                   uint16_t chunk_length,
                                   uint8_t aggregate_method,
@@ -310,9 +311,9 @@ static void _AggregateLinearTrend(float32_t* data, uint16_t data_length,
   float32_t* p = data;
   while (p < &data[data_length - 1]) {
     float32_t* chunk = p;
-    uint16_t length =
-        ((p + chunk_length < &data[data_length - 1]) ? chunk_length
-                                                     : last_chunk_length);
+    uint16_t length = ((p + (chunk_length - 1) <= &data[data_length - 1])
+                           ? chunk_length
+                           : last_chunk_length);
     if (aggregate_method == 0u) {
       y[linreg_length] = _Mean(p, length);
     } else if (aggregate_method == 1u) {
