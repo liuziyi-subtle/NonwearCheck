@@ -25,9 +25,9 @@ static float32_t k_mem_pool[256u];
 static float32_t k_variance;
 static float32_t k_mean;
 
-static inline int _CmpFunc(const void* a, const void* b) {
-  return (*(float32_t*)a > *(float32_t*)b) ? 1 : -1;
-}
+// static inline int _CmpFunc(const void* a, const void* b) {
+//   return (*(float32_t*)a > *(float32_t*)b) ? 1 : -1;
+// }
 
 float32_t _Mean(const float32_t* data, uint16_t data_length) {
   uint16_t count;      /*<< loop counter */
@@ -456,6 +456,24 @@ static float32_t _ChangeQuantile(float32_t* data, uint16_t data_length,
   }
 }
 
+static void _SortFunc(float32_t* data, uint16_t data_length) {
+  float32_t temp;
+  uint32_t i, j;
+  // Sort the array nums in ascending order
+  for (i = 0; i < data_length - 1; i++) {
+    for (j = i + 1; j < data_length; j++) {
+      if (data[j] < data[i]) {
+        // swap elements
+        temp = data[i];
+        data[i] = data[j];
+        data[j] = temp;
+      }
+    }
+  }
+
+  return;
+}
+
 static float _ExtractFeatsGreen(float32_t* data, uint16_t data_length,
                                 union NonwearEntry* feats) {
   uint16_t i;
@@ -491,7 +509,8 @@ static float _ExtractFeatsGreen(float32_t* data, uint16_t data_length,
   for (i = 0u; i < data_length; ++i) {
     data_sorted[i] = data[i];
   }
-  qsort(data_sorted, data_length, sizeof(float32_t), _CmpFunc);
+  // qsort(data_sorted, data_length, sizeof(float32_t), _CmpFunc);
+  _SortFunc(data_sorted, data_length);
 
   float32_t q_000 = data_sorted[0];
   float32_t q_020 = _Quantile(data_sorted, data_length, 0.20);
@@ -569,7 +588,8 @@ static float _ExtractFeatsIR(float32_t* data, uint16_t data_length,
   for (i = 0u; i < data_length; ++i) {
     data_sorted[i] = data[i];
   }
-  qsort(data_sorted, data_length, sizeof(float32_t), _CmpFunc);
+  // qsort(data_sorted, data_length, sizeof(float32_t), _CmpFunc);
+  _SortFunc(data_sorted, data_length);
 
   float32_t q_025 = _Quantile(data_sorted, data_length, 0.25);
   float32_t q_075 = _Quantile(data_sorted, data_length, 0.75);
