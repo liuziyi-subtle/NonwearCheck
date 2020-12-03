@@ -159,18 +159,18 @@ def annotate_record(manual_info):
                  'creation_date': manual_info['creation_date']})
 
 
-RECORD_MOVE_DIR = '/Users/liuziyi/Documents/Lifesense/data/nonwear-check/O/results-20200709/records'
-REFERENCE_MOVE_DIR = '/Users/liuziyi/Documents/Lifesense/data/nonwear-check/O/results-20200709/references'
-ANNOTATION_SAVE_DIR = '/Users/liuziyi/Documents/Lifesense/data/nonwear-check/O/results-20200709/jsons'
-with open('/Users/liuziyi/Documents/Lifesense/data/nonwear-check/O/raw/value_descriptions.json') as f:
+RECORD_MOVE_DIR = '/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/435/results/records'
+REFERENCE_MOVE_DIR = '/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/435/results/references'
+ANNOTATION_SAVE_DIR = '/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/435/results/jsons'
+with open('/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/435/raw/value_descriptions.json') as f:
     VALUE_DESCRIPTIONS = json.load(f)
 
 record_paths = glob(
-    '/Users/liuziyi/Documents/Lifesense/data/nonwear-check/O/raw/20200709/records/*.csv')
+    '/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/435/raw/20201202/records/*.csv')
 record_paths.sort()
 
 manual_infos = pd.read_csv(
-    '/Users/liuziyi/Documents/Lifesense/data/nonwear-check/O/raw/测试数据说明_汇总.csv')
+    '/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/435/raw/测试数据说明_汇总.csv')
 
 for rp in record_paths:
     # 如果只存在标号1
