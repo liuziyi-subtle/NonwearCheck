@@ -734,7 +734,19 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
  * */
 #define NWC_PPG_LENGTH_AIR (36)
 static float32_t k_ppg_air[NWC_PPG_LENGTH_AIR];
-static union NonwearEntry k_feats_air[2];
+static union NonwearEntry k_feats_air[4];
+
+float32_t _Minimum(float32_t *data, uint16_t data_length) {
+  float32_t minimum = data[0];
+  uint16_t i;
+  for (i = 0; i < data_length; ++i) {
+    if (data[i] <= minimum) {
+      minimum = data[i];
+    }
+  }
+
+  return minimum;
+}
 
 void _ExtractFeatsGreenAir(float32_t* data, uint16_t data_length,
                            union NonwearEntry* feats) {
@@ -745,13 +757,23 @@ void _ExtractFeatsGreenAir(float32_t* data, uint16_t data_length,
 
   /* ppg__autocorrelation__lag_1 */
   float32_t auto_correlation_lag1 = _AutoCorrelation(data, data_length, 1u);
-  feats[0].fvalue = auto_correlation_lag1;
+  feats[2].fvalue = auto_correlation_lag1;
+  // printf("auto_correlation_lag1: %f\n", auto_correlation_lag1);
+
+  /* ppg__autocorrelation__lag_1 */
+  float32_t auto_correlation_lag2 = _AutoCorrelation(data, data_length, 2u);
+  feats[0].fvalue = auto_correlation_lag2;
+  // printf("auto_correlation_lag1: %f\n", auto_correlation_lag1);
+
+  /* ppg__autocorrelation__lag_1 */
+  float32_t minimum = _Minimum(data, data_length);
+  feats[1].fvalue = minimum;
   // printf("auto_correlation_lag1: %f\n", auto_correlation_lag1);
 
   /* ppg__agg_linear_trend__f_agg_"max"__chunk_len_50__attr_"intercept" */
   float32_t intercept = .0f;
   _AggregateLinearTrend(data, data_length, 10u, 0u, &intercept, NULL, NULL);
-  feats[1].fvalue = intercept;
+  feats[3].fvalue = intercept;
   // printf("intercept: %f\n", intercept);
 
   return;
@@ -793,6 +815,7 @@ uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init) {
   if (s->sensor_type == NWC_SOURCE_PPG_G) {
     _ExtractFeatsGreenAir(k_ppg_air, NWC_PPG_LENGTH_AIR, k_feats_air);
     proba = PredictGreenAir(k_feats_air);
+    printf("proba: %f\n", proba);
   } else if (s->sensor_type == NWC_SOURCE_PPG_IR) {
     return 0u;
   } else {
