@@ -836,13 +836,16 @@ uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init) {
     return 0u;
   }
 
-  if (proba > 0.7f) {
+  if (proba > 0.5f) {
     min_toair_times += 1;
-    if (min_toair_times >= 3 || k_mean_air < 60000) {
+    if (min_toair_times >= 2) {
       return 1u;
     } else {
       return 0u;
     }
+  } else if (k_mean_air < 60000) {
+    min_toair_times = 0;
+    return 1u;
   } else {
     min_toair_times = 0;
     return 0u;
