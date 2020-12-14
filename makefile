@@ -2,7 +2,7 @@ CC = $(Compiler) -g
 CFLAGS = -Wall -Wextra
 
 # 0 - 单条数据  1 - 多个文件
-DFLAGS = -DALGO_DEBUG=1
+DFLAGS = -DALGO_DEBUG=0
 
 DIR_DEBUG = debug
 

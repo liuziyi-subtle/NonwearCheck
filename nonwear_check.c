@@ -732,9 +732,10 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
  * 对空验证.
  *
  * */
-#define NWC_PPG_LENGTH_AIR (36)
+#define NWC_PPG_LENGTH_AIR (64)
 static float32_t k_ppg_air[NWC_PPG_LENGTH_AIR];
-static union NonwearEntry k_feats_air[4];
+static float32_t k_ppg_air_temp[NWC_PPG_LENGTH_AIR];
+static union NonwearEntry k_feats_air[3];
 
 float32_t _Minimum(float32_t *data, uint16_t data_length) {
   float32_t minimum = data[0];
@@ -752,40 +753,49 @@ void _ExtractFeatsGreenAir(float32_t* data, uint16_t data_length,
                            union NonwearEntry* feats) {
   /* First compute variance and mean to avoid repetitive computation in each
    * function. */
+  // k_variance = _Variance(data, (uint16_t)data_length, 0u);
+  // k_mean = _Mean(data, (uint16_t)data_length);
+
+  for (uint16_t i = 0; i < data_length; ++i) {
+    data[i] = data[i] - k_mean;
+  }
   k_variance = _Variance(data, (uint16_t)data_length, 0u);
   k_mean = _Mean(data, (uint16_t)data_length);
 
   /* ppg__autocorrelation__lag_1 */
-  float32_t auto_correlation_lag1 = _AutoCorrelation(data, data_length, 1u);
-  feats[2].fvalue = auto_correlation_lag1;
-  // printf("auto_correlation_lag1: %f\n", auto_correlation_lag1);
-
-  /* ppg__autocorrelation__lag_1 */
   float32_t auto_correlation_lag2 = _AutoCorrelation(data, data_length, 2u);
   feats[0].fvalue = auto_correlation_lag2;
-  // printf("auto_correlation_lag1: %f\n", auto_correlation_lag1);
+  printf("auto_correlation_lag2: %f\n", auto_correlation_lag2);
 
   /* ppg__autocorrelation__lag_1 */
-  float32_t minimum = _Minimum(data, data_length);
-  feats[1].fvalue = minimum;
-  // printf("auto_correlation_lag1: %f\n", auto_correlation_lag1);
+  float32_t auto_correlation_lag9 = _AutoCorrelation(data, data_length, 9u);
+  feats[1].fvalue = auto_correlation_lag9;
+  printf("auto_correlation_lag9: %f\n", auto_correlation_lag9);
+
+  /* ppg__autocorrelation__lag_1 */
+  // float32_t minimum = _Minimum(data, data_length);
+  // feats[1].fvalue = minimum;
+  // printf("minimum: %f\n", minimum);
 
   /* ppg__agg_linear_trend__f_agg_"max"__chunk_len_50__attr_"intercept" */
-  float32_t intercept = .0f;
-  _AggregateLinearTrend(data, data_length, 10u, 0u, &intercept, NULL, NULL);
-  feats[3].fvalue = intercept;
-  // printf("intercept: %f\n", intercept);
+  float32_t sterrest = .0f;
+  _AggregateLinearTrend(data, data_length, 10u, 0u, NULL, &sterrest, NULL);
+  feats[2].fvalue = sterrest;
+  printf("sterrest: %f\n", sterrest);
 
   return;
 }
 
 uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init) {
-  static uint16_t call_counter;
+  static uint16_t min_toair_times;
+  static uint32_t fullfilled_flag;
   uint16_t i;
 
   /* Initialization */
   if (init) {
-    call_counter = 1u;
+    // call_counter = 1u;
+    fullfilled_flag = 0u;
+    min_toair_times = 0u;
     return 0u;
   }
 
@@ -794,27 +804,30 @@ uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init) {
 
   /* pull the newest values. */
   for (i = 0; i < (uint16_t)s->sample_length; ++i) {
+    // k_ppg_air[NWC_PPG_LENGTH_AIR - s->sample_length + i] =
+    //     (float32_t)(s->sig_t.signal[i] - 5000000) / 1000.0;
     k_ppg_air[NWC_PPG_LENGTH_AIR - s->sample_length + i] =
-        (float32_t)(s->sig_t.signal[i] - 5000000) / 1000.0;
+        (float32_t)(s->sig_t.signal[i]);
+    fullfilled_flag += 1;
   }
 
   /* 3次之后buffer填满才能进入后续调用. */
-  if (call_counter < 3u) {
-    call_counter += 1u;
+  if (fullfilled_flag < NWC_PPG_LENGTH_AIR) {
+    // call_counter += 1u;
     return 0u;
-  } else {
-    call_counter = 1u;
   }
 
-  // for (i = 0; i < NWC_PPG_LENGTH_AIR; ++i) {
-  //   printf("k_ppg_air[%u]: %f\n", i, k_ppg_air[i]);
-  // }
+  for (i = 0; i < NWC_PPG_LENGTH_AIR; ++i) {
+    k_ppg_air_temp[i] = k_ppg_air[i];
+    // printf("k_ppg_air[%u]: %f\n", i, k_ppg_air[i]);
+  }
 
   /* 对空特征判断. */
   float32_t proba = .0f;
   if (s->sensor_type == NWC_SOURCE_PPG_G) {
-    _ExtractFeatsGreenAir(k_ppg_air, NWC_PPG_LENGTH_AIR, k_feats_air);
+    _ExtractFeatsGreenAir(k_ppg_air_temp, NWC_PPG_LENGTH_AIR, k_feats_air);
     proba = PredictGreenAir(k_feats_air);
+    // printf("\n");
     printf("proba: %f\n", proba);
   } else if (s->sensor_type == NWC_SOURCE_PPG_IR) {
     return 0u;
@@ -823,8 +836,12 @@ uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init) {
   }
 
   if (proba > 0.7f) {
-    return 1u;
+    min_toair_times += 1;
+    if (min_toair_times >= 3) {
+      return 1u;
+    }
   } else {
+    min_toair_times = 0;
     return 0u;
   }
 }
