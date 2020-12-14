@@ -735,6 +735,7 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
 #define NWC_PPG_LENGTH_AIR (64)
 static float32_t k_ppg_air[NWC_PPG_LENGTH_AIR];
 static float32_t k_ppg_air_temp[NWC_PPG_LENGTH_AIR];
+static float32_t k_mean_air;
 static union NonwearEntry k_feats_air[3];
 
 float32_t _Minimum(float32_t *data, uint16_t data_length) {
@@ -754,10 +755,10 @@ void _ExtractFeatsGreenAir(float32_t* data, uint16_t data_length,
   /* First compute variance and mean to avoid repetitive computation in each
    * function. */
   // k_variance = _Variance(data, (uint16_t)data_length, 0u);
-  // k_mean = _Mean(data, (uint16_t)data_length);
+  k_mean_air = _Mean(data, (uint16_t)data_length);
 
   for (uint16_t i = 0; i < data_length; ++i) {
-    data[i] = data[i] - k_mean;
+    data[i] = data[i] - k_mean_air;
   }
   k_variance = _Variance(data, (uint16_t)data_length, 0u);
   k_mean = _Mean(data, (uint16_t)data_length);
@@ -837,8 +838,10 @@ uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init) {
 
   if (proba > 0.7f) {
     min_toair_times += 1;
-    if (min_toair_times >= 3) {
+    if (min_toair_times >= 3 || k_mean_air < 60000) {
       return 1u;
+    } else {
+      return 0u;
     }
   } else {
     min_toair_times = 0;
