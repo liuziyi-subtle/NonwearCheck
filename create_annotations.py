@@ -120,13 +120,15 @@ def annotate_segment(record_path, toggle_selector, manual_info):
 
     ax_ppg.plot(range(ppg.shape[0]), ppg)
     ax_ppg.set_xlim(0, ppg.shape[0] - 1)
-    ax_ppg.legend('PPG')
+    ax_ppg.legend(['PPG'])
+    ax_ppg.set_title(record_path.split('/')[-1])
 
     toggle_selector.annotation_sample_rate = 25  # 矩形框标注时除以采样率算不同类型标注数据的共同时间
     toggle_selector.length = int(ppg.shape[0] / 25)
 
     ax_acc.plot(range(acc.shape[0]), acc)
     ax_acc.set_xlim(0, acc.shape[0] - 1)
+    ax_acc.legend(['AccX', 'AccY', 'AccZ'])
 
     # groundtruth = pd.read_csv(os.path.join(
     #     k_groundtruth_dir, manual_info["groundtruth_name"]), header=None).values[:, 0]
@@ -144,7 +146,7 @@ def annotate_segment(record_path, toggle_selector, manual_info):
                                            interactive=True)
 
     plt.connect('key_press_event', toggle_selector)
-    plt.title(record_path.split('/')[-1])
+    # plt.title(record_path.split('/')[-1])
     plt.show()
 
 
