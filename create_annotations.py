@@ -53,9 +53,13 @@ def toggle_selector(event):
 
         toggle_selector.dict_segment.update(
             dict(toggle_selector.manual_info.drop(['file_name',
-                                                   'creation_date'])))
+                                                   'creation_date',
+                                                   'light'])))
         # value_category_id - [131, 2]
         toggle_selector.dict_segment['value_category_id'] = toggle_selector.value_category_id
+        # wear_category_id
+        wear_category_id = 0 if "person" in toggle_selector.dict_segment.keys() else 1
+        toggle_selector.dict_segment['wear_category_id'] = wear_category_id
         # # groundtruth
         # toggle_selector.dict_segment['groundtruth_name'] = toggle_selector.groundtruth_name
         # # comparison_hr
@@ -88,31 +92,26 @@ def annotate_segment(record_path, toggle_selector, manual_info):
 
     acc_data_id = 2
     if 161 in record[0].values:
-        print("xxxxxxxx")
+        print("161")
         ppg_data_id = 161
+        ppg_data_type = "green"
         toggle_selector.value_category_id = [ppg_data_id, acc_data_id]
+        toggle_selector.annotation_sample_rate = 25  # 矩形框标注时除以采样率算不同类型标注数据的共同时间
     else:
-        print("yyyyyyy")
+        print("164")
         ppg_data_id = 164
+        ppg_data_type = "ir"
+        toggle_selector.annotation_sample_rate = 100  # 矩形框标注时除以采样率算不同类型标注数据的共同时间
         toggle_selector.value_category_id = [ppg_data_id, acc_data_id]
-
-    # toggle_selector.value_category_id = [131, 2]
 
     ppg = record.loc[record[0] == ppg_data_id, 1].values
-    print(ppg)
     ppg = np.array(ppg, dtype=np.uint16)
-    print("ppg.shape", ppg.shape)
-    # ppg = ppg & 0xffff
-    # ppg = np.array(ppg, dtype=np.uint16)
-    # ppg = ppg - 2**23
-    print("ppg_data_id: ", ppg_data_id)
     acc = record.loc[record[0] == acc_data_id, [1, 2, 3]]
 
     toggle_selector.manual_info = manual_info
     toggle_selector.dict_record = annotate_record(manual_info)
-    # toggle_selector.groundtruth_name = manual_info["groundtruth_name"]
-    # toggle_selector.comparison_hr_name = manual_info["comparison_hr_name"]
-
+    toggle_selector.length = int(
+        ppg.shape[0] / toggle_selector.annotation_sample_rate)
     toggle_selector.dict_segment = {
         'record_id': toggle_selector.dict_record['id']}
 
@@ -120,11 +119,9 @@ def annotate_segment(record_path, toggle_selector, manual_info):
 
     ax_ppg.plot(range(ppg.shape[0]), ppg)
     ax_ppg.set_xlim(0, ppg.shape[0] - 1)
-    ax_ppg.legend(['PPG'])
+    ax_ppg.legend(['PPG\n({}\n{}\n{})'.format(
+        ppg_data_type, manual_info["face_to"], manual_info["distance_from"])])
     ax_ppg.set_title(record_path.split('/')[-1])
-
-    toggle_selector.annotation_sample_rate = 25  # 矩形框标注时除以采样率算不同类型标注数据的共同时间
-    toggle_selector.length = int(ppg.shape[0] / 25)
 
     ax_acc.plot(range(acc.shape[0]), acc)
     ax_acc.set_xlim(0, acc.shape[0] - 1)
@@ -178,14 +175,14 @@ record_paths.sort()
 
 manual_infos = pd.read_csv(os.path.join(k_root_dir, "manual_info.csv"))
 
-for record_path in record_paths[133:]:
+for record_path in record_paths:
     print(record_path)
     manual_info = manual_infos[manual_infos['file_name']
                                == record_path.split('/')[-1]].iloc[0]
     manual_info = manual_info[manual_info.notnull()]
 
-    print(record_path, manual_info)
+    print(record_path, manual_infos.shape)
 
-    annotate_segment(record_path, toggle_selector, manual_info)
+    # annotate_segment(record_path, toggle_selector, manual_info)
 
-    finish = input("继续下一个样本: y/n")
+    # finish = input("继续下一个样本: y/n")
