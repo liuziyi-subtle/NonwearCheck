@@ -175,6 +175,8 @@ record_paths.sort()
 
 manual_infos = pd.read_csv(os.path.join(k_root_dir, "manual_info.csv"))
 
+print(manual_infos)
+
 for record_path in record_paths:
     print(record_path)
     manual_info = manual_infos[manual_infos['file_name']
