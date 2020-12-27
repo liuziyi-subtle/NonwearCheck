@@ -1,3 +1,6 @@
+# Copyright (c) 2020 Liu Ziyi
+
+import argparse
 import numpy as np
 import os
 import json
@@ -6,199 +9,189 @@ from datetime import datetime
 import time
 from scipy import signal
 
-
-object_id_iter = iter(range(10000000))
-
-
-# def resample(record):
-#     n_sample = int(record.shape[0] / 4)
-#     record = record.iloc[::4, :]
-#     return record
+OBJECT_ID_GENERATOR = iter(range(10000000))
 
 
-def resample(record):
-    '''简单降采样
-       TODO: 需要基于最小公倍数作采样
-    '''
-    record = record.iloc[::2, :]
-    return record
+def parse_annotation(annotations, value_category_id):
+    def sort_segments(segment_list):
+        starts = [s["start"] for s in segment_list]
+        sorted_starts = sorted(range(len(starts)), key=lambda k: starts[k])
+        sorted_segment_list = [segment_list[k] for k in sorted_starts]
+        return sorted_segment_list
 
-
-def hp(record):
-    sos = signal.butter(4, 0.4, 'high', fs=25, output='sos')
-    record['ppg'] = signal.sosfilt(sos, record['ppg'])
-    record = record[200:]
-    return record
-
-
-def log_transform(record):
-    # print('before log_transform: ', list(record['ppg'][1000:1064]))
-    record['ppg'] = np.around(np.log2(np.abs(record['ppg']) + 1), decimals=6)
-    # print('after log_transform: ', list(record['ppg'][1000:1064]))
-    return record
-
-
-def scale(data):
-    data = (data - 5000000) / 1000.0
-    # data = (data - 5000000) / 256
-    return data
-
-
-preprocess_func_map = {'resample': resample,
-                       'hp': hp,
-                       'log_transform': log_transform,
-                       'scale': scale}
-
-
-def local2utc(localtime):
-    localtime = datetime.strptime(localtime, "%Y-%m-%d %H:%M:%S")
-    utc = time.mktime(localtime.timetuple())
-    return utc
-
-
-def parse_annotation(annotations, value_category_ids=None, face_to_list=None, color_list=None):
-    ''' TODO: 假如多个检索条件的联合判断，筛选出需要的annotations.
-    '''
     annotation_index = {}
-
-    # record_id: segment键值对
     for segment_annotation in annotations['segment_annotations']:
-        condition_1, condition_2, condition_3 = False, False, False
-        if segment_annotation['value_category_id'] in value_category_ids:
-            condition_1 = True
-        if 'face_to' in segment_annotation.keys():
-            if segment_annotation['face_to'] in face_to_list:
-                condition_2 = True
-        if 'color' in segment_annotation.keys():
-            if segment_annotation['color'] in color_list:
-                condition_3 = True
-        # if segment_annotation['value_category_id'] in value_category_ids:
-        if condition_1 and (condition_2 or condition_3):
-            record_id = segment_annotation['record_id']
-            if record_id not in annotation_index:
-                annotation_index[record_id] = []
-            annotation_index[record_id].append(segment_annotation)
+        # filter out unwanted segments.
+        # if segment_annotation["value_category_id"] != value_category_id:
+        #     continue
+        if value_category_id not in segment_annotation["value_category_id"]:
+            continue
+
+        record_id = segment_annotation['record_id']
+        if record_id not in annotation_index:
+            annotation_index[record_id] = []
+        annotation_index[record_id].append(segment_annotation)
+
+    # make sure segment annotations store in ascent order.
+    for key, value in annotation_index.items():
+        annotation_index[key] = sort_segments(value)
+
     return annotation_index
 
 
-def replace_timestamp(timestamp):
-    return timestamp.replace('T', ' ').split('.')[0]
-
-
-def segment2object(segment, object_length):
+def segment2object(segment, object_length, overlap):
     objects = []
-    # for i in range(0, segment.shape[0] - object_length, int(object_length / 2)):
-    for i in range(0, segment.shape[0] - object_length, int(object_length)):
+    for i in range(0, segment.shape[0] - object_length, overlap):
         object = segment.iloc[i:i+object_length, :].copy()
-        # print(object)
-        # object = precess_func(object)
-        # object['ppg'] = object['ppg'] - object['ppg'].mean()
-        # object.rename(columns={'id': 'segment_id'}, inplace=True)
-        object['id'] = next(object_id_iter)
+        object['id'] = next(OBJECT_ID_GENERATOR)
         objects.append(object)
-    # objects = process_func(objects)
     return objects
 
 
 def create_object(record_annotation,
                   annotation_list,
-                  value_categories,
+                  value_category,
                   record_dir,
-                  object_length=256,
-                  target_fs=25,
-                  preprocess_func_s=None):
-    for value_category in value_categories:
-        if value_category['id'] == annotation_list[0]['value_category_id']:
-            break
+                  groundtruth_dir,
+                  object_length,
+                  target_fs,
+                  preprocess_funcs=None,
+                  target_id=None):
+    # read mtk format record.
     record = pd.read_csv(os.path.join(record_dir, record_annotation['name']),
                          header=None, error_bad_lines=False)
-    record = record[record[0] == value_category['id']]
-    # print(record)
-    record.rename(columns={1: 'ppg'}, inplace=True)
-    record = record[['ppg']]
-    # print(record.columns)
-    # record = record['ppg']
 
-    # resample
-    sample_step = int(value_category['sample_rate'] / target_fs)
-    # record = record[::sample_step]
+    # downsample to target_fs
+    record = record.iloc[::int(value_category["sample_rate"] / target_fs), :]
 
-    # preprocess
-    if preprocess_func_s:
-        print(preprocess_func_s)
-        for pfs in preprocess_func_s.split(','):
-            record['ppg'] = preprocess_func_map[pfs](record['ppg'].values)
+    # TODO: using one sos.
+    if "acc" in value_category["value_type"]:
+        record = record.loc[record[0] == value_category['id'], [1, 2, 3]]
+        record.rename(columns={1: 'AccX', 2: 'AccY', 3: 'AccZ'}, inplace=True)
+
+        # record['AccX'] = np.array(record['AccX'], np.int16) >> 6
+        sos = signal.butter(4, [0.4, 4], "bandpass", fs=25, output='sos')
+        record['AccX'] = signal.sosfilt(sos, record['AccX'])
+
+        # record['AccY'] = np.array(record['AccY'], np.int16) >> 6
+        sos = signal.butter(4, [0.4, 4], "bandpass", fs=25, output='sos')
+        record['AccY'] = signal.sosfilt(sos, record['AccY'])
+
+        # record['AccZ'] = np.array(record['AccZ'], np.int16) >> 6
+        sos = signal.butter(4, [0.4, 4], "bandpass", fs=25, output='sos')
+        record['AccZ'] = signal.sosfilt(sos, record['AccZ'])
+
+        record['Resultant'] = np.power(
+            record['AccX'], 2) + np.power(record['AccY'], 2) + np.power(record['AccZ'], 2)
+    else:
+        record = record.loc[record[0] ==
+                            value_category['id'], [1]].astype(np.int32)
+        record = record.applymap(lambda x: x & 0xffffff - 2 ** 23)
+        record.rename(columns={1: value_category["value_type"]}, inplace=True)
+        sos = signal.butter(4, [0.4, 4], "bandpass", fs=25, output='sos')
+        record[value_category["value_type"]] = signal.sosfilt(
+            sos, record[value_category["value_type"]])
 
     object_list = []
     for segment_annotation in annotation_list:
-        start = int(segment_annotation['start'])
-        end = int(segment_annotation['end'])
+        start = int(segment_annotation['start'] * target_fs)
+        end = int(segment_annotation['end'] * target_fs)
         segment = record.iloc[start:end].copy()
-        segment['wear_category_id'] = segment_annotation['wear_category_id']
+        if target_id:
+            segment[target_id] = segment_annotation[target_id]
+        segment['record_id'] = str(segment_annotation['record_id'])
         segment['segment_id'] = segment_annotation['id']
-        # segment = segment[::sample_step]
-        cut_start = 500
-        cut_end = len(segment) - 500
-        segment = segment[cut_start:cut_end:sample_step]
-        objects = segment2object(segment, object_length)
+        # record to segments with overlapping.
+        objects = segment2object(segment, object_length, target_fs)
+        # downsample groundtruth and get mean from each 8 secconds.
+        ground_truth = pd.read_csv(os.path.join(
+            groundtruth_dir, segment_annotation["groundtruth_name"]))
+        ground_truth = ground_truth.iloc[start:end]
+        ground_truth = ground_truth.iloc[::target_fs, :].values
+        ground_truth = [ground_truth[i: i + 8]
+                        for i in range(len(ground_truth) - 8)]
+        # objects and ground_truth must have the same length.
+        min_length = np.min([len(ground_truth), len(objects)])
+        print(min_length, len(ground_truth), len(objects))
+        ground_truth = ground_truth[:min_length]
+        objects = objects[:min_length]
+
+        for object, gt in zip(objects, ground_truth):
+            # print(gt)
+            pre_hrs = np.array(gt[:7]).T
+            object["prev_hrs"] = np.repeat(
+                pre_hrs, object_length, axis=0).tolist()
+            hr = np.array([gt[7]] * object_length).reshape(object_length, 1)
+            object["hr"] = hr
         object_list.extend(objects)
     return object_list
 
 
+"""
+usage:
+python3 create_datasets.py --annotations_path /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/annotations.json \
+                           --value_category_id 2 \
+                           --record_dir /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/RecordsMTKFormat \
+                           --groundtruth_dir /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/GroundTruthMTKFormat \
+                           --object_length 200 \
+                           --save_path /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/df_object_acc.csv
+python3 create_datasets.py --annotations_path /data/data/HeartRate/GoodixDemoWatch/Results/annotations.json \
+                           --value_category_id 131 \
+                           --record_dir /data/data/HeartRate/GoodixDemoWatch/Results/RecordsMTKFormat \
+                           --groundtruth_dir /data/data/HeartRate/GoodixDemoWatch/Results/GroundTruthMTKFormat \
+                           --object_length 200 \
+                           --save_path /data/data/HeartRate/GoodixDemoWatch/Results/df_object_ppg.csv
+"""
+
 if __name__ == '__main__':
-    '''
-    usage:
-    python3 ./create_dataset.py --annotations_path /data/workspace/data/nonwear-check/O/results/annotations.json \
-                                --record_dir /data/workspace/data/nonwear-check/O/results/records \
-                                --object_length 128 \
-                                --preprocess_func_s scale \
-                                --save_path /data/workspace/data/nonwear-check/O/results/objects__ppg-g_scale.csv
-    python3 ./create_dataset.py --annotations_path /data/workspace/data/nonwear-check/O/results/annotations.json \
-                                --record_dir /data/workspace/data/nonwear-check/O/results/records \
-                                --object_length 128 \
-                                --save_path /data/workspace/data/nonwear-check/O/results/objects__ppg-g__object_length_128.csv
-<<<<<<< HEAD
-    python3 ./create_dataset.py --annotations_path /data/data/nonwear-check/O/results/annotations.json \
-                                --record_dir /data/data/nonwear-check/O/results/records \
-                                --object_length 24 \
-                                --save_path /data/data/nonwear-check/O/results/objects__ppg-g__object_length_24.csv
-=======
-    python3 ./create_dataset.py --annotations_path /data-temp/data/nonwear-check/O/results/annotations.json \
-                                --record_dir /data-temp/data/nonwear-check/O/results/records \
-                                --object_length 36 \
-                                --save_path /data-temp/data/nonwear-check/O/results/objects__ppg-g__object_length_36__cut_500.csv
->>>>>>> ed2ff8c3ada47cc26d09150e35210f331d246c89
-    '''
-    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--annotations_path', type=str, help='')
+    parser.add_argument('--value_category_id', type=int, help='')
     parser.add_argument('--record_dir', type=str, help='')
-    parser.add_argument('--object_length', type=int, default=128, help='')
-    parser.add_argument('--preprocess_func_s', type=str, default=None, help='')
+    parser.add_argument('--groundtruth_dir', type=str, help='')
+    parser.add_argument('--object_length', type=int, default=256, help='')
+    parser.add_argument('--preprocess_funcs', type=str, default=None, help='')
     parser.add_argument('--save_path', type=str, help='')
     args = parser.parse_args()
 
     with open(args.annotations_path, 'r') as f:
         annotations = json.load(f)
 
-    annotation_index = parse_annotation(
-        annotations, value_category_ids=[1, 131], face_to_list=['air'], color_list=['p4', 'p5', 'p6'])  # [1, 131]
+    # example: {record_id: [segment_annotation, segment_annotation, ...], ...}
+    annotation_index = parse_annotation(annotations, args.value_category_id)
+
+    # all record annotations.
     record_annotations = annotations['record_annotations']
 
+    # get value_category of which id be the same with args.value_category_id.
+    for vc in annotations['value_categories']:
+        if vc["id"] == args.value_category_id:
+            value_category = vc
+            break
+
+    # get objects from each record.
     object_list = []
     for record_annotation in record_annotations:
         if record_annotation['id'] not in annotation_index:
             continue
+
+        # segment annotations in one record.
         annotation_list = annotation_index[record_annotation['id']]
-        objects = create_object(
-            record_annotation,
-            annotation_list,
-            annotations['value_categories'],
-            args.record_dir,
-            object_length=args.object_length,
-            target_fs=25,
-            preprocess_func_s=args.preprocess_func_s)
+        if len(annotation_list) > 1:
+            print(annotation_list)
+
+        objects = create_object(record_annotation,
+                                annotation_list,
+                                value_category,
+                                args.record_dir,
+                                args.groundtruth_dir,
+                                object_length=args.object_length,
+                                target_fs=25,
+                                preprocess_funcs=args.preprocess_funcs)
         object_list.extend(objects)
+
     df_objects = pd.concat(object_list)
+    print(df_objects)
     df_objects.to_csv(args.save_path, index=False)
+    print(args.save_path)
     print("Done.")
