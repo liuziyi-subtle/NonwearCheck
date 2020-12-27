@@ -183,8 +183,8 @@ for record_path in record_paths:
                                == record_path.split('/')[-1]].iloc[0]
     manual_info = manual_info[manual_info.notnull()]
 
-    print(record_path, manual_infos.shape)
+    # print(record_path, manual_infos.shape)
 
-    # annotate_segment(record_path, toggle_selector, manual_info)
+    annotate_segment(record_path, toggle_selector, manual_info)
 
-    # finish = input("继续下一个样本: y/n")
+    finish = input("继续下一个样本: y/n")
