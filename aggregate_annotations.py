@@ -26,7 +26,7 @@ def rename_segment_id(segment_annotation):
 if __name__ == '__main__':
     '''
     usage:
-    python3 aggregate_annotations.py --json_dir /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results/jsons \
+    python3 aggregate_annotations.py --json_dir /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results/Jsons \
                                      --record_field record \
                                      --segment_field segment \
                                      --value_description_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results/value_descriptions.json \
@@ -69,7 +69,7 @@ if __name__ == '__main__':
                    'modules': value_descriptions['modules'],
                    'wear_categories': value_descriptions['wear_categories']
                    }
-    annotations = json.dumps(annotations)
+    annotations = json.dumps(annotations, ensure_ascii=False)
     with open(args.save_path, 'w') as f:
         f.write(annotations)
         print("Done.")
