@@ -77,6 +77,12 @@ def toggle_selector(event):
         json_dict = {'record': toggle_selector.dict_record,
                      'segment': toggle_selector.dict_segment}
         print(json_dict)
+        if 'age' in json_dict["segment"]:
+            json_dict["segment"]['age'] = int(json_dict["segment"]['age'])
+        # for key, value in json_dict["segment"].items():
+        #     print(key, value, "-->", type(value))
+        #     if type(value) == "np.int64":
+        #         json_dict["segment"][key] = int(value)
         json_dict = json.dumps(json_dict, ensure_ascii=False)
         json_name = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         json_name = json_name.replace(' ', '(') + ')_channel1.json'
