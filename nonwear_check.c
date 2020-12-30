@@ -10,7 +10,7 @@ typedef float float32_t;
 typedef double float64_t;
 
 #define NWC_PPG_LENGTH (128u)
-#define NWC_FEATS_LENGTH (10u)
+#define NWC_FEATS_LENGTH (6u)
 #define NWC_PROBA_TH (0.7f)  // min prob to comfirm nonwear
 #define NWC_CHECK_RESULTS_SIZE (10u)
 #define NWC_LOWER_PPG_TH_G (-5000)
@@ -474,6 +474,81 @@ static float32_t _RatioValueNumber2TimeSeriesLength(float32_t* data,
     return (float32_t)count / (float32_t)data_length;
 }
 
+/*
+ * data assumed to be sorted.
+ */
+static void _ReoccuringProperty(float32_t* data, uint16_t data_length,
+                         float32_t* unique2all, float32_t* sum_reoccuring,
+                         float32_t* reoccuring_times2all) {
+  if (data_length == 0u) {
+    return;
+  }
+
+  for (uint16_t i = 0; i < data_length; ++i) {
+    printf("data[%u]: %f, ", i, data[i]);
+  }
+
+  float32_t* p = data;
+  float32_t* q = data;
+  uint16_t counts = 1u;
+  uint16_t unique_counts = 1u;
+  uint16_t reoccuring_counts = 0u;
+
+  while (q++ < &data[data_length - 1]) {
+    if (*q != *p) {
+      unique_counts += 1u;
+      if (counts > 1) {
+        reoccuring_counts += counts;
+        *sum_reoccuring += (*p) * counts;
+        printf("p: %f, sum_reoccuring: %f\n", *p, *sum_reoccuring);
+      }
+
+      p = q;
+      counts = 1;
+    } else {
+      counts++;
+
+      /* the last element should be added if it is repeated more than 2 times */
+      if (q == &data[data_length - 1]) {
+        reoccuring_counts += counts;
+        if (counts > 1) {
+          *sum_reoccuring += (*p) * counts;
+        }
+      }
+    }
+  }
+
+  *unique2all = unique_counts / (float32_t)data_length;
+  *reoccuring_times2all = (float32_t)reoccuring_counts / data_length;
+
+  return;
+}
+
+static float32_t _CidCe(float32_t* data, uint16_t data_length, bool normalize) {
+  float32_t std = sqrtf(k_variance);
+  float32_t* data_temp = k_mem_pool;
+  float32_t cidce;
+
+  uint16_t i;
+  if (std != 0) {
+    for (i = 0; i < data_length; ++i) {
+      data_temp[i] = (data[i] - k_mean) / std;
+    }
+  } else {
+    // cidce = .0f;
+    return .0f;
+  }
+
+  float32_t sum_diff = 0;
+  for (i = 1u; i < data_length; ++i) {
+    sum_diff += (data_temp[i] - data_temp[i - 1]) * (data_temp[i] - data_temp[i - 1]);
+  }
+
+  cidce = sqrtf(sum_diff);
+
+  return cidce;
+}
+
 static void _SortFunc(float32_t* data, uint16_t data_length) {
   float32_t temp;
   uint32_t i, j;
@@ -503,64 +578,65 @@ static float _ExtractFeatsGreen(float32_t* data, uint16_t data_length,
   k_variance = _Variance(data, (uint16_t)data_length, 0u);
   k_mean = _Mean(data, (uint16_t)data_length);
 
-  /* ppg__ar_2 */
-  float32_t* coefficients = _AutoRegression(data, data_length, 10u);
-  feats[0].fvalue = coefficients[2];
+  /* 'ppg_g__autocorrelation__lag_2' */
+  float32_t auto_correlation_lag2 = _AutoCorrelation(data, data_length, 2u);
+  feats[0].fvalue = auto_correlation_lag2;
+  printf("auto_correlation_lag2: %f\n", auto_correlation_lag2);
 
-  /* ppg__number_peaks__n_3 */
-  uint16_t num_peaks = _NumPeaks(data, data_length, 3u);
-  feats[1].fvalue = (float32_t)num_peaks;
-
-  /* ppg__autocorrelation__lag_4 */
-  float32_t auto_correlation_lag4 = _AutoCorrelation(data, data_length, 4u);
-  feats[2].fvalue = auto_correlation_lag4;
-
-  /* ppg__agg_linear_trend__f_agg_"var"__chunk_len_5__attr_"stderr" */
+  /* 'ppg_g__agg_linear_trend__attr_"stderr"__chunk_len_5__f_agg_"var"' */
   float32_t sterrest = .0f;
   _AggregateLinearTrend(data, data_length, 5u, 1u, NULL, &sterrest, NULL);
-  feats[3].fvalue = sterrest;
-
-  /* ppg__agg_linear_trend__f_agg_"mean"__chunk_len_10__attr_"stderr" */
-  _AggregateLinearTrend(data, data_length, 10u, 0u, NULL, &sterrest, NULL);
-  feats[4].fvalue = sterrest;
+  feats[1].fvalue = sterrest;
+  printf("sterrest: %f\n", sterrest);
 
   /* sort data. */
   float32_t* data_sorted = k_mem_pool;
   for (i = 0u; i < data_length; ++i) {
     data_sorted[i] = data[i];
   }
-  // qsort(data_sorted, data_length, sizeof(float32_t), _CmpFunc);
   _SortFunc(data_sorted, data_length);
 
   float32_t q_000 = data_sorted[0];
   float32_t q_020 = _Quantile(data_sorted, data_length, 0.20);
   float32_t q_025 = _Quantile(data_sorted, data_length, 0.25);
+  float32_t q_040 = _Quantile(data_sorted, data_length, 0.40);
+  float32_t q_060 = _Quantile(data_sorted, data_length, 0.60);
   float32_t q_075 = _Quantile(data_sorted, data_length, 0.75);
   float32_t q_080 = _Quantile(data_sorted, data_length, 0.80);
   float32_t q_100 = data_sorted[data_length - 1];
 
-  /* ppg__binned_entropy__max_bins_10 */
-  float32_t binned_entropy = _BinnedEntropy(data_sorted, data_length, 10u);
-  feats[5].fvalue = binned_entropy;
+  /* 'ppg_g__change_quantiles__f_agg_"mean"__isabs_True__qh_0.8__ql_0.2' */
+  float32_t cq_080_020 =
+      _ChangeQuantile(data, data_length, q_080, q_020, true, 0u);
+  feats[2].fvalue = cq_080_020;
+  printf("cq_080_020: %f\n", cq_080_020);
 
-  /*
-   * ppg__change_quantiles__f_agg_"mean"__isabs_True__qh_0.2__ql_0.0
-   * ppg__change_quantiles__f_agg_"mean"__isabs_True__qh_1.0__ql_0.8
-   * ppg__change_quantiles__f_agg_"var"__isabs_True__qh_1.0__ql_0.0
-   */
-  float32_t cq_000_020 =
-      _ChangeQuantile(data, data_length, q_020, q_000, true, 0u);
-  float32_t cq_080_100 =
-      _ChangeQuantile(data, data_length, q_100, q_080, true, 0u);
-  float32_t cq_000_100 =
-      _ChangeQuantile(data, data_length, q_100, q_000, true, 1u);
-  feats[6].fvalue = cq_000_020;
-  feats[7].fvalue = cq_080_100;
-  feats[8].fvalue = cq_000_100;
+  /* 'ppg_g__change_quantiles__f_agg_"var"__isabs_True__qh_0.6__ql_0.4' */
+  float32_t cq_060_040 =
+      _ChangeQuantile(data, data_length, q_060, q_040, true, 1u);
+  feats[3].fvalue = cq_060_040;
+  printf("cq_060_040: %f\n", cq_060_040);
 
-  /* ppg__ratio_beyond_r_sigma__r_1.5 */
-  float32_t ratio_beyond_r_sigma = _RatioBeyondSigma(data, data_length, 1.5f);
-  feats[9].fvalue = ratio_beyond_r_sigma;
+  /* sort data. */
+  data_sorted = k_mem_pool;
+  for (i = 0u; i < data_length; ++i) {
+    data_sorted[i] = data[i];
+  }
+  _SortFunc(data_sorted, data_length);
+
+  /* 'ppg_g__sum_of_reoccurring_data_points' */
+  float32_t unique2all = .0f;
+  float32_t sum_reoccuring = .0f;
+  float32_t reoccuring_times2all = .0f;
+  _ReoccuringProperty(data_sorted, data_length, &unique2all, &sum_reoccuring,
+                      &reoccuring_times2all);
+  feats[4].fvalue = sum_reoccuring;
+  printf("sum_reoccuring: %f\n", sum_reoccuring);
+
+  /* 'ppg_g__ratio_value_number_to_time_series_length' */
+  float32_t r2tsl = _RatioValueNumber2TimeSeriesLength(data_sorted, data_length);
+  feats[5].fvalue = r2tsl;
+  printf("r2tsl: %f\n", r2tsl);
 
   /* 返回最大值, 用于基于最大值的判断条件. */
   float32_t maxVal = q_075 + 1.5 * (q_075 - q_025);
@@ -677,8 +753,8 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
 
   /* pull the newest values. */
   for (i = 0; i < (uint16_t)s->sample_length; ++i) {
-    k_ppg[NWC_PPG_LENGTH - s->sample_length + i] =
-        (float32_t)(s->sig_t.signal[i] - 5000000) / 1000.0;
+    k_ppg[NWC_PPG_LENGTH - s->sample_length + i] = (float32_t)(s->sig_t.signal[i]);
+        // (float32_t)(s->sig_t.signal[i] - 5000000) / 1000.0;
   }
 
   if (call_counter < 2u) {
@@ -690,6 +766,7 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
   if (s->sensor_type == NWC_SOURCE_PPG_G) {
     float32_t maxVal = _ExtractFeatsGreen(k_ppg, NWC_PPG_LENGTH, k_feats);
     proba = PredictGreen(k_feats);
+    printf("proba: %f\n", proba);
     ruleResults[rPtr++] = maxVal < NWC_LOWER_PPG_TH_G ? 1u : 0u;
   } else if (s->sensor_type == NWC_SOURCE_PPG_IR) {
     float32_t maxVal = _ExtractFeatsIR(k_ppg, NWC_PPG_LENGTH, k_feats);
@@ -699,9 +776,6 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
     return 0u;
   }
 
-  for (i = 0; i < 9; ++i) {
-    printf("[%u]: %f\n", i, k_feats[i].fvalue);
-  }
   printf("proba: %f\n", proba);
 
   /* Accept a 2-time consistant results from model */
