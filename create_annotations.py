@@ -53,8 +53,8 @@ def toggle_selector(event):
 
         toggle_selector.dict_segment.update(
             dict(toggle_selector.manual_info.drop(['file_name',
-                                                   'creation_date',
-                                                   'light'])))
+                                                   'creation_date'
+                                                   ])))
         # value_category_id - [131, 2]
         toggle_selector.dict_segment['value_category_id'] = toggle_selector.value_category_id
         # wear_category_id
@@ -79,7 +79,7 @@ def toggle_selector(event):
         print(json_dict)
         json_dict = json.dumps(json_dict, ensure_ascii=False)
         json_name = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        json_name = json_name.replace(' ', '(') + ')_channel1.json'
+        json_name = json_name.replace(' ', '(') + ')_channel_green_ir.json'
         json_path = os.path.join(k_json_dir, json_name)
         with open(json_path, 'w') as f:
             f.write(json_dict)
@@ -89,41 +89,46 @@ def annotate_segment(record_path, toggle_selector, manual_info):
     record = pd.read_csv(record_path, header=None,
                          error_bad_lines=False, warn_bad_lines=False,
                          verbose=False)
+    record = record.loc[record[0] != "APP_MSG"]
+    record[0] = record[0].astype(np.int32)
 
     acc_data_id = 2
-    if 161 in record[0].values:
-        print("161")
-        ppg_data_id = 161
-        ppg_data_type = "green"
-        toggle_selector.value_category_id = [ppg_data_id, acc_data_id]
-        toggle_selector.annotation_sample_rate = 25  # 矩形框标注时除以采样率算不同类型标注数据的共同时间
-    else:
-        print("164")
-        ppg_data_id = 164
-        ppg_data_type = "ir"
-        toggle_selector.annotation_sample_rate = 100  # 矩形框标注时除以采样率算不同类型标注数据的共同时间
-        toggle_selector.value_category_id = [ppg_data_id, acc_data_id]
+    ppg_green_id = 1
+    ppg_ir_id = 4
+    toggle_selector.value_category_id = [ppg_green_id, ppg_ir_id, acc_data_id]
+    toggle_selector.annotation_sample_rate = 50  # 矩形框标注时除以采样率算不同类型标注数据的共同时间
 
-    ppg = record.loc[record[0] == ppg_data_id, 1].values
-    ppg = np.array(ppg, dtype=np.uint16)
-    acc = record.loc[record[0] == acc_data_id, [1, 2, 3]]
+    ppg_green = record.loc[record[0] == ppg_green_id, 1].values
+    print("ppg_green.shape", ppg_green.shape)
+    ppg_ir = record.loc[record[0] == ppg_ir_id, 1].values
+    # ppg = np.array(ppg, dtype=np.uint16)
+    acc = record.loc[record[0] == acc_data_id, [1, 2, 3]].values
 
     toggle_selector.manual_info = manual_info
     toggle_selector.dict_record = annotate_record(manual_info)
     toggle_selector.length = int(
-        ppg.shape[0] / toggle_selector.annotation_sample_rate)
+        np.min([ppg_green.shape[0], ppg_ir.shape[0]]) / toggle_selector.annotation_sample_rate)
     toggle_selector.dict_segment = {
         'record_id': toggle_selector.dict_record['id']}
 
-    fig, (ax_ppg, ax_acc) = plt.subplots(2, 1, sharex=True)
+    fig, (ax_ppg_green, ax_ppg_ir, ax_acc) = plt.subplots(3, 1, sharex=True)
 
-    ax_ppg.plot(range(ppg.shape[0]), ppg)
-    ax_ppg.set_xlim(0, ppg.shape[0] - 1)
-    ax_ppg.legend(['PPG\n({}\n{}\n{})'.format(
-        ppg_data_type, manual_info["face_to"], manual_info["distance_from"])])
-    ax_ppg.set_title(record_path.split('/')[-1])
+    ppg_green = ppg_green.reshape(1, -1)
+    ax_ppg_green.plot(range(ppg_green.shape[0]), ppg_green)
+    ax_ppg_green.set_xlim(0, ppg_green.shape[0] - 1)
+    ax_ppg_green.legend(['PPG\n({}\n{}\n{})'.format(
+        "ppg_green", manual_info["face_to"], manual_info["distance_from"])])
+    ax_ppg_green.set_title(record_path.split('/')[-1])
 
-    ax_acc.plot(range(acc.shape[0]), acc)
+    # ax_ppg_ir.plot(range(ppg_ir.shape[0]), ppg_ir)
+    # ax_ppg_ir.set_xlim(0, ppg_ir.shape[0] - 1)
+    # ax_ppg_ir.legend(['PPG\n({}\n{}\n{})'.format(
+    #     "ppg_ir", manual_info["face_to"], manual_info["distance_from"])])
+    # ax_ppg_ir.set_title(record_path.split('/')[-1])
+
+    # ax_acc.plot(range(acc.shape[0]), acc[:, 1])
+    # ax_acc.plot(range(acc.shape[0]), acc)
+    # ax_acc.plot(range(acc.shape[0]), acc)
     ax_acc.set_xlim(0, acc.shape[0] - 1)
     ax_acc.legend(['AccX', 'AccY', 'AccZ'])
 
@@ -134,7 +139,7 @@ def annotate_segment(record_path, toggle_selector, manual_info):
     # ax_groundtruth.plot(range(groundtruth.shape[0]), groundtruth)
     # ax_groundtruth.set_xlim(0, groundtruth.shape[0] - 1)
 
-    toggle_selector.RS = RectangleSelector(ax_ppg, line_select_callback,
+    toggle_selector.RS = RectangleSelector(ax_ppg_green, line_select_callback,
                                            drawtype='box', useblit=True,
                                            # don't use middle button
                                            button=[1, 3],
@@ -160,7 +165,7 @@ k_record_id_generator = iter(range(generator_start, generator_start + 100000))
 generator_start = int(datetime.now().timestamp() + str2id("segment"))
 k_segment_id_generator = iter(range(generator_start, generator_start + 100000))
 
-k_root_dir = "/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results"
+k_root_dir = "/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results"
 k_record_dir = os.path.join(k_root_dir, "Records")
 k_reference_dir = os.path.join(k_root_dir, "References")
 # k_groundtruth_dir = os.path.join(k_root_dir, "GroundTruthMTKFormat")
