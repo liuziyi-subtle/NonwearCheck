@@ -1,11 +1,10 @@
 from tsfresh.examples.har_dataset import download_har_dataset, load_har_dataset, load_har_classes
-import seaborn as sns
 from tsfresh import extract_features, extract_relevant_features, select_features
 from tsfresh.utilities.dataframe_functions import impute
 from tsfresh.feature_extraction import ComprehensiveFCParameters, feature_calculators
 import pandas as pd
 import numpy as np
-import ar
+# import ar
 
 
 def scale(data):
@@ -104,8 +103,8 @@ def ar_feature(df_objects):
 if __name__ == '__main__':
     '''
     usage:
-    python3 ./extract_features.py --object_path /data/data/NonwearCheck/450/Results/df_object_ppg_ir.csv \
-                                  --feature_path /data/data/NonwearCheck/450/Results/df_feat_ppg_ir.csv
+    python3 ./extract_feats.py --object_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/df_object_ppg_ir.csv \
+                                  --feature_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/df_feat_ppg_ir.csv
     '''
     import argparse
     parser = argparse.ArgumentParser()
