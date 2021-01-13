@@ -177,8 +177,8 @@ manual_infos = pd.read_csv(os.path.join(k_root_dir, "manual_info.csv"))
 
 print(manual_infos)
 
-for record_path in record_paths:
-    print(record_path)
+for (i, record_path) in enumerate(record_paths):
+    print(i, record_path)
     manual_info = manual_infos[manual_infos['file_name']
                                == record_path.split('/')[-1]].iloc[0]
     manual_info = manual_info[manual_info.notnull()]
