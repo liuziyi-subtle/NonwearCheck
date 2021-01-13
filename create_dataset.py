@@ -21,9 +21,6 @@ def parse_annotation(annotations, value_category_id):
 
     annotation_index = {}
     for segment_annotation in annotations['segment_annotations']:
-        # filter out unwanted segments.
-        # if segment_annotation["value_category_id"] != value_category_id:
-        #     continue
         if value_category_id not in segment_annotation["value_category_id"]:
             continue
 
@@ -54,47 +51,40 @@ def create_object(record_annotation,
                   record_dir,
                   object_length,
                   target_fs,
-                  groundtruth_dir=None,
                   preprocess_funcs=None,
                   target_id=None):
+    if not annotation_list:
+        return
+
+    value_category_id = value_category["id"]
+    value_sample_rate = annotation_list[0]["value_sample_rate"][
+        annotation_list[0]["value_category_id"] == value_category_id]
+    value_type = value_category["value_type"]
+    print("value_category_id, value_sample_rate, value_type: ",
+          value_category_id, value_sample_rate, value_type)
+
     # read mtk format record.
     record = pd.read_csv(os.path.join(record_dir, record_annotation['name']),
                          header=None, error_bad_lines=False)
+    record = record.loc[record[0] != "APP_MSG"]
+    record[0] = record[0].astype(np.int32)
 
-    # downsample to target_fs
-    record = record.iloc[::int(value_category["sample_rate"] / target_fs), :]
-
-    # TODO: using one sos.
-    if "acc" in value_category["value_type"]:
-        record = record.loc[record[0] == value_category['id'], [1, 2, 3]]
+    if value_type == "acc":
+        record = record.loc[record[0] == value_category_id, [1, 2, 3]]
         record.rename(columns={1: 'AccX', 2: 'AccY', 3: 'AccZ'}, inplace=True)
-
-        # record['AccX'] = np.array(record['AccX'], np.int16) >> 6
-        sos = signal.butter(4, [0.4, 4], "bandpass", fs=25, output='sos')
-        record['AccX'] = signal.sosfilt(sos, record['AccX'])
-
-        # record['AccY'] = np.array(record['AccY'], np.int16) >> 6
-        sos = signal.butter(4, [0.4, 4], "bandpass", fs=25, output='sos')
-        record['AccY'] = signal.sosfilt(sos, record['AccY'])
-
-        # record['AccZ'] = np.array(record['AccZ'], np.int16) >> 6
-        sos = signal.butter(4, [0.4, 4], "bandpass", fs=25, output='sos')
-        record['AccZ'] = signal.sosfilt(sos, record['AccZ'])
-
         record['Resultant'] = np.power(
-            record['AccX'], 2) + np.power(record['AccY'], 2) + np.power(record['AccZ'], 2)
+            record['AccX'], 2) + np.power(record['AccY'], 2) + \
+            np.power(record['AccZ'], 2)
     else:
-        record = record.loc[record[0] ==
-                            value_category['id'], [1]].astype(np.uint16)
-        record.rename(columns={1: value_category["value_type"]}, inplace=True)
+        record = record.loc[record[0] == value_category_id, [1]]
+        record.rename(columns={1: value_type}, inplace=True)
+    record = record.iloc[::int(value_sample_rate / target_fs), :]  # downsample
 
     object_list = []
     for segment_annotation in annotation_list:
         start = int(segment_annotation['start'] * target_fs)
         end = int(segment_annotation['end'] * target_fs)
         segment = record.iloc[start:end].copy()
-        # if target_id:
-        #     segment[target_id] = segment_annotation[target_id]
         segment['record_id'] = str(segment_annotation['record_id'])
         segment['segment_id'] = segment_annotation['id']
         segment["wear_category_id"] = segment_annotation["wear_category_id"]
@@ -107,17 +97,11 @@ def create_object(record_annotation,
 
 """
 usage:
-python3 create_datasets.py --annotations_path /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/annotations.json \
-                           --value_category_id 2 \
-                           --record_dir /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/RecordsMTKFormat \
-                           --groundtruth_dir /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/GroundTruthMTKFormat \
-                           --object_length 200 \
-                           --save_path /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/df_object_acc.csv
-python3 create_dataset.py --annotations_path /data/data/NonwearCheck/450/Results/annotations.json \
-                          --value_category_id 164 \
-                          --record_dir /data/data/NonwearCheck/450/Results/Records \
+python3 create_dataset.py --annotations_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/annotations.json \
+                          --value_category_id 4 \
+                          --record_dir /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/Records \
                           --object_length 128 \
-                          --save_path /data/data/NonwearCheck/450/Results/df_object_ppg_ir.csv
+                          --save_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/df_object_ppg_ir.csv
 """
 
 if __name__ == '__main__':
@@ -125,7 +109,6 @@ if __name__ == '__main__':
     parser.add_argument('--annotations_path', type=str, help='')
     parser.add_argument('--value_category_id', type=int, help='')
     parser.add_argument('--record_dir', type=str, help='')
-    parser.add_argument('--groundtruth_dir', type=str, help='')
     parser.add_argument('--object_length', type=int, default=256, help='')
     parser.add_argument('--preprocess_funcs', type=str, default=None, help='')
     parser.add_argument('--save_path', type=str, help='')
@@ -154,8 +137,6 @@ if __name__ == '__main__':
 
         # segment annotations in one record.
         annotation_list = annotation_index[record_annotation['id']]
-        # if len(annotation_list) > 1:
-        #     print(annotation_list)
 
         objects = create_object(record_annotation,
                                 annotation_list,

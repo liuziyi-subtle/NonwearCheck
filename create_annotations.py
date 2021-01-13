@@ -55,15 +55,12 @@ def toggle_selector(event):
             dict(toggle_selector.manual_info.drop(['file_name',
                                                    'creation_date'
                                                    ])))
-        # value_category_id - [131, 2]
+        # value_category_id
         toggle_selector.dict_segment['value_category_id'] = toggle_selector.value_category_id
+        toggle_selector.dict_segment['value_sample_rate'] = toggle_selector.value_sample_rate
         # wear_category_id
         wear_category_id = 0 if "person" in toggle_selector.dict_segment.keys() else 1
         toggle_selector.dict_segment['wear_category_id'] = wear_category_id
-        # # groundtruth
-        # toggle_selector.dict_segment['groundtruth_name'] = toggle_selector.groundtruth_name
-        # # comparison_hr
-        # toggle_selector.dict_segment['comparison_hr_name'] = toggle_selector.comparison_hr_name
 
         print("x-> 保存!")
     if event.key in ['X', 'x']:
@@ -96,39 +93,37 @@ def annotate_segment(record_path, toggle_selector, manual_info):
     ppg_green_id = 1
     ppg_ir_id = 4
     toggle_selector.value_category_id = [ppg_green_id, ppg_ir_id, acc_data_id]
+    toggle_selector.value_sample_rate = [50, 50, 25]
     toggle_selector.annotation_sample_rate = 50  # 矩形框标注时除以采样率算不同类型标注数据的共同时间
 
-    ppg_green = record.loc[record[0] == ppg_green_id, 1].values
-    print("ppg_green.shape", ppg_green.shape)
-    ppg_ir = record.loc[record[0] == ppg_ir_id, 1].values
-    # ppg = np.array(ppg, dtype=np.uint16)
-    acc = record.loc[record[0] == acc_data_id, [1, 2, 3]].values
+    ppg_green = record.loc[record[0] ==
+                           ppg_green_id, 1].values.astype(np.int32)
+    ppg_ir = record.loc[record[0] == ppg_ir_id, 1].values.astype(np.int32)
+    acc = record.loc[record[0] == acc_data_id,
+                     [1, 2, 3]].values.astype(np.int16)
 
+    toggle_selector.length = int(
+        np.min([ppg_green.shape[0] / 50, ppg_ir.shape[0] / 50, acc.shape[0] / 25]))
     toggle_selector.manual_info = manual_info
     toggle_selector.dict_record = annotate_record(manual_info)
-    toggle_selector.length = int(
-        np.min([ppg_green.shape[0], ppg_ir.shape[0]]) / toggle_selector.annotation_sample_rate)
     toggle_selector.dict_segment = {
         'record_id': toggle_selector.dict_record['id']}
 
     fig, (ax_ppg_green, ax_ppg_ir, ax_acc) = plt.subplots(3, 1, sharex=True)
 
-    ppg_green = ppg_green.reshape(1, -1)
     ax_ppg_green.plot(range(ppg_green.shape[0]), ppg_green)
     ax_ppg_green.set_xlim(0, ppg_green.shape[0] - 1)
     ax_ppg_green.legend(['PPG\n({}\n{}\n{})'.format(
         "ppg_green", manual_info["face_to"], manual_info["distance_from"])])
     ax_ppg_green.set_title(record_path.split('/')[-1])
 
-    # ax_ppg_ir.plot(range(ppg_ir.shape[0]), ppg_ir)
-    # ax_ppg_ir.set_xlim(0, ppg_ir.shape[0] - 1)
-    # ax_ppg_ir.legend(['PPG\n({}\n{}\n{})'.format(
-    #     "ppg_ir", manual_info["face_to"], manual_info["distance_from"])])
-    # ax_ppg_ir.set_title(record_path.split('/')[-1])
+    ax_ppg_ir.plot(range(ppg_ir.shape[0]), ppg_ir)
+    ax_ppg_ir.set_xlim(0, ppg_ir.shape[0] - 1)
+    ax_ppg_ir.legend(['PPG\n({}\n{}\n{})'.format(
+        "ppg_ir", manual_info["face_to"], manual_info["distance_from"])])
+    ax_ppg_ir.set_title(record_path.split('/')[-1])
 
-    # ax_acc.plot(range(acc.shape[0]), acc[:, 1])
-    # ax_acc.plot(range(acc.shape[0]), acc)
-    # ax_acc.plot(range(acc.shape[0]), acc)
+    ax_acc.plot(range(acc.shape[0]), acc)
     ax_acc.set_xlim(0, acc.shape[0] - 1)
     ax_acc.legend(['AccX', 'AccY', 'AccZ'])
 

@@ -31,11 +31,11 @@ if __name__ == '__main__':
                                      --segment_field segment \
                                      --value_description_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results/value_descriptions.json \
                                      --save_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results/annotations.json
-    python3 aggregate_annotations.py --json_dir /data/data/nonwear-check/O/results/jsons \
+    python3 aggregate_annotations.py --json_dir /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/Jsons \
                                      --record_field record \
                                      --segment_field segment \
-                                     --value_description_path /data/data/nonwear-check/O/raw/value_descriptions.json \
-                                     --save_path /data/data/nonwear-check/O/results/annotations.json
+                                     --value_description_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/value_descriptions.json \
+                                     --save_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/annotations.json
     '''
     import argparse
     import os
@@ -66,7 +66,6 @@ if __name__ == '__main__':
     annotations = {'record_annotations': record_annotations,
                    'segment_annotations': segment_annotations,
                    'value_categories': value_descriptions['value_categories'],
-                   'modules': value_descriptions['modules'],
                    'wear_categories': value_descriptions['wear_categories']
                    }
     annotations = json.dumps(annotations, ensure_ascii=False)
