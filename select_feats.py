@@ -25,17 +25,19 @@ import treelite
 import datetime
 import time
 
+import datatable as dt
+
 sns.set(style="ticks")
 np.set_printoptions(suppress=True)
 
 pd.set_option('display.max_rows', 150)
 
-df_feats = pd.read_csv(
-    "/data/data/NonwearCheck/450/Results/df_feat_ppg_ir.csv", index_col=None)
+df_feats = dt.fread(
+    "/data/data/NonwearCheck/450/Results/df_feat_ppg_ir.csv").to_pandas()
 df_feats = df_feats.iloc[shuffle(range(len(df_feats)), random_state=0), :]
 
-df_objects = pd.read_csv(
-    "/data/data/NonwearCheck/450/Results/df_object_ppg_ir.csv", index_col=None)
+df_objects = dt.fread(
+    "/data/data/NonwearCheck/450/Results/df_object_ppg_ir.csv").to_pandas()
 
 feats_cols = [c for c in df_feats.columns if "ppg" in c]
 target_col = "wear_category_id"

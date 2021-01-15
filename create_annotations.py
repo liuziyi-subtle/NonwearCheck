@@ -88,6 +88,7 @@ def annotate_segment(record_path, toggle_selector, manual_info):
                          verbose=False)
     record = record.loc[record[0] != "APP_MSG"]
     record[0] = record[0].astype(np.int32)
+    print(record)
 
     acc_data_id = 2
     ppg_green_id = 1
@@ -109,18 +110,18 @@ def annotate_segment(record_path, toggle_selector, manual_info):
     toggle_selector.dict_segment = {
         'record_id': toggle_selector.dict_record['id']}
 
-    fig, (ax_ppg_green, ax_ppg_ir, ax_acc) = plt.subplots(3, 1, sharex=True)
+    fig, (ax_ppg_green, ax_ppg_ir, ax_acc) = plt.subplots(3, 1, sharex=False)
 
     ax_ppg_green.plot(range(ppg_green.shape[0]), ppg_green)
     ax_ppg_green.set_xlim(0, ppg_green.shape[0] - 1)
-    ax_ppg_green.legend(['PPG\n({}\n{}\n{})'.format(
-        "ppg_green", manual_info["face_to"], manual_info["distance_from"])])
+    # ax_ppg_green.legend(['PPG\n({}\n{}\n{})'.format(
+    #     "ppg_green", manual_info["face_to"], manual_info["distance_from"])])
     ax_ppg_green.set_title(record_path.split('/')[-1])
 
     ax_ppg_ir.plot(range(ppg_ir.shape[0]), ppg_ir)
     ax_ppg_ir.set_xlim(0, ppg_ir.shape[0] - 1)
-    ax_ppg_ir.legend(['PPG\n({}\n{}\n{})'.format(
-        "ppg_ir", manual_info["face_to"], manual_info["distance_from"])])
+    # ax_ppg_ir.legend(['PPG\n({}\n{}\n{})'.format(
+    #     "ppg_ir", manual_info["face_to"], manual_info["distance_from"])])
     ax_ppg_ir.set_title(record_path.split('/')[-1])
 
     ax_acc.plot(range(acc.shape[0]), acc)
