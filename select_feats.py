@@ -84,16 +84,7 @@ num_iter = 20
 
 accs = []
 append_feats = []
-feats_tobe_combined = ['ppg_ir__cid_ce__normalize_True',
-                       'ppg_ir__change_quantiles__f_agg_"var"__isabs_False__qh_0.6__ql_0.4',
-                       'ppg_ir__number_peaks__n_1',
-                       'ppg_ir__agg_linear_trend__attr_"intercept"__chunk_len_50__f_agg_"max"',
-                       'ppg_ir__binned_entropy__max_bins_10',
-                       'ppg_ir__percentage_of_reoccurring_values_to_all_values',
-                       'ppg_ir__ratio_beyond_r_sigma__r_0.5',
-                       'ppg_ir__number_peaks__n_3',
-                       'ppg_ir__autocorrelation__lag_2',
-                       'ppg_ir__autocorrelation__lag_6']
+feats_tobe_combined = []
 corrcoefs = []
 
 df_results = pd.DataFrame({})
@@ -177,4 +168,4 @@ else:
     columns = ["append_feats"] + ["accs"]
     df_results = pd.DataFrame(df_results, columns=columns)
 
-df_results.to_csv("df_results_9feats_1231-ir.csv", index=None)
+df_results.to_csv("df_results_1feats__0114ir.csv", index=None)

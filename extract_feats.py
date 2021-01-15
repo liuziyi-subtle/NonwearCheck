@@ -22,7 +22,7 @@ def tsfresh_feats(df_objects, cols2extract):
     for c in cols2extract:
         df = df_objects.loc[:, ['id', c]].copy()
         X = extract_features(df, column_id='id', impute_function=impute,
-                             default_fc_parameters=extraction_settings)
+                             default_fc_parameters=extraction_settings, n_jobs=28)
         df_feats.append(X)
     df_feats = pd.concat(df_feats, axis=1)
     df_feats['wear_category_id'] = list(
@@ -103,8 +103,8 @@ def ar_feature(df_objects):
 if __name__ == '__main__':
     '''
     usage:
-    python3 ./extract_feats.py --object_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/df_object_ppg_ir.csv \
-                                  --feature_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/df_feat_ppg_ir.csv
+    python3 ./extract_feats.py --object_path /data/data/NonwearCheck/439/Results/df_object_ppg_green.csv \
+                               --feature_path /data/data/NonwearCheck/439/Results/df_feat_ppg_green.csv
     '''
     import argparse
     parser = argparse.ArgumentParser()
@@ -121,7 +121,7 @@ if __name__ == '__main__':
 
     # cols2tsfresh = set(object_columns) ^ set(
     #     ['timestamp', 'wear_category_id', 'segment_id', 'id'])
-    df_tsfresh_feats = tsfresh_feats(df_objects, ['ppg_ir'])  # tsfresh特征
+    df_tsfresh_feats = tsfresh_feats(df_objects, ['ppg_green'])  # tsfresh特征
 
     # cols2angle = ['Accelerometer X', 'Accelerometer Y', 'Accelerometer Z']
     # df_angle_features = angle_feature(df_objects, cols2angle)

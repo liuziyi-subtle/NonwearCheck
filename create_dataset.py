@@ -97,11 +97,11 @@ def create_object(record_annotation,
 
 """
 usage:
-python3 create_dataset.py --annotations_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/annotations.json \
-                          --value_category_id 4 \
-                          --record_dir /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/Records \
+python3 create_dataset.py --annotations_path /data/data/NonwearCheck/439/Results/annotations.json \
+                          --value_category_id 1 \
+                          --record_dir /data/data/NonwearCheck/439/Results/Records \
                           --object_length 128 \
-                          --save_path /Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/439/Results/df_object_ppg_ir.csv
+                          --save_path /data/data/NonwearCheck/439/Results/df_object_ppg_green.csv
 """
 
 if __name__ == '__main__':
