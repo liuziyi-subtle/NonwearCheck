@@ -8,7 +8,7 @@ DIR_DEBUG = debug
 
 DIR_RESULTS = results
 
-ETOBJS = main.o nonwear_check.o nonwear_model_green.o nonwear_model_ir.o nonwear_model_toair_green.o
+ETOBJS = main.o nonwear_check.o nonwear_model_green.o nonwear_model_ir.o
 
 all:	$(DIR_RESULTS) executable
 
@@ -29,9 +29,6 @@ nonwear_model_green.o:
 
 nonwear_model_ir.o:
 	$(CC) $(CFLAGS) -c nonwear_model_ir.c $(DFLAGS)
-
-nonwear_model_toair_green.o:
-	$(CC) $(CFLAGS) -c nonwear_model_toair_green.c $(DFLAGS)
 
 debug.o:
 	$(CC) $(CFLAGS) -c $(DIR_DEBUG)/debug.c -o $@ -I$(DIR_DEBUG) $(DFLAGS)
