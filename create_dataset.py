@@ -39,7 +39,7 @@ def parse_annotation(annotations, value_category_id):
     return annotation_index
 
 
-def segment2object(segment, object_length, overlap):
+def segment2object(segment, object_length, overlap=None):
     objects = []
     for i in range(0, segment.shape[0] - object_length, overlap):
         object = segment.iloc[i:i+object_length, :].copy()
@@ -52,9 +52,9 @@ def create_object(record_annotation,
                   annotation_list,
                   value_category,
                   record_dir,
-                  groundtruth_dir,
                   object_length,
                   target_fs,
+                  groundtruth_dir=None,
                   preprocess_funcs=None,
                   target_id=None):
     # read mtk format record.
@@ -85,44 +85,22 @@ def create_object(record_annotation,
             record['AccX'], 2) + np.power(record['AccY'], 2) + np.power(record['AccZ'], 2)
     else:
         record = record.loc[record[0] ==
-                            value_category['id'], [1]].astype(np.int32)
-        record = record.applymap(lambda x: x & 0xffffff - 2 ** 23)
+                            value_category['id'], [1]].astype(np.uint16)
         record.rename(columns={1: value_category["value_type"]}, inplace=True)
-        sos = signal.butter(4, [0.4, 4], "bandpass", fs=25, output='sos')
-        record[value_category["value_type"]] = signal.sosfilt(
-            sos, record[value_category["value_type"]])
 
     object_list = []
     for segment_annotation in annotation_list:
         start = int(segment_annotation['start'] * target_fs)
         end = int(segment_annotation['end'] * target_fs)
         segment = record.iloc[start:end].copy()
-        if target_id:
-            segment[target_id] = segment_annotation[target_id]
+        # if target_id:
+        #     segment[target_id] = segment_annotation[target_id]
         segment['record_id'] = str(segment_annotation['record_id'])
         segment['segment_id'] = segment_annotation['id']
+        segment["wear_category_id"] = segment_annotation["wear_category_id"]
         # record to segments with overlapping.
-        objects = segment2object(segment, object_length, target_fs)
-        # downsample groundtruth and get mean from each 8 secconds.
-        ground_truth = pd.read_csv(os.path.join(
-            groundtruth_dir, segment_annotation["groundtruth_name"]))
-        ground_truth = ground_truth.iloc[start:end]
-        ground_truth = ground_truth.iloc[::target_fs, :].values
-        ground_truth = [ground_truth[i: i + 8]
-                        for i in range(len(ground_truth) - 8)]
-        # objects and ground_truth must have the same length.
-        min_length = np.min([len(ground_truth), len(objects)])
-        print(min_length, len(ground_truth), len(objects))
-        ground_truth = ground_truth[:min_length]
-        objects = objects[:min_length]
-
-        for object, gt in zip(objects, ground_truth):
-            # print(gt)
-            pre_hrs = np.array(gt[:7]).T
-            object["prev_hrs"] = np.repeat(
-                pre_hrs, object_length, axis=0).tolist()
-            hr = np.array([gt[7]] * object_length).reshape(object_length, 1)
-            object["hr"] = hr
+        objects = segment2object(
+            segment, object_length, overlap=int(object_length/2))
         object_list.extend(objects)
     return object_list
 
@@ -135,12 +113,11 @@ python3 create_datasets.py --annotations_path /Users/liuziyi/Documents/Lifesense
                            --groundtruth_dir /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/GroundTruthMTKFormat \
                            --object_length 200 \
                            --save_path /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/df_object_acc.csv
-python3 create_datasets.py --annotations_path /data/data/HeartRate/GoodixDemoWatch/Results/annotations.json \
-                           --value_category_id 131 \
-                           --record_dir /data/data/HeartRate/GoodixDemoWatch/Results/RecordsMTKFormat \
-                           --groundtruth_dir /data/data/HeartRate/GoodixDemoWatch/Results/GroundTruthMTKFormat \
-                           --object_length 200 \
-                           --save_path /data/data/HeartRate/GoodixDemoWatch/Results/df_object_ppg.csv
+python3 create_dataset.py --annotations_path /data/data/NonwearCheck/450/Results/annotations.json \
+                          --value_category_id 164 \
+                          --record_dir /data/data/NonwearCheck/450/Results/Records \
+                          --object_length 128 \
+                          --save_path /data/data/NonwearCheck/450/Results/df_object_ppg_ir.csv
 """
 
 if __name__ == '__main__':
@@ -177,14 +154,13 @@ if __name__ == '__main__':
 
         # segment annotations in one record.
         annotation_list = annotation_index[record_annotation['id']]
-        if len(annotation_list) > 1:
-            print(annotation_list)
+        # if len(annotation_list) > 1:
+        #     print(annotation_list)
 
         objects = create_object(record_annotation,
                                 annotation_list,
                                 value_category,
                                 args.record_dir,
-                                args.groundtruth_dir,
                                 object_length=args.object_length,
                                 target_fs=25,
                                 preprocess_funcs=args.preprocess_funcs)
