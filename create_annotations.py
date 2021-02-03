@@ -167,11 +167,11 @@ generator_start = int(datetime.now().timestamp() + str2id("segment"))
 k_segment_id_generator = iter(range(generator_start, generator_start + 100000))
 
 k_root_dir = "/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results"
-k_record_dir = os.path.join(k_root_dir, "Records")
+k_record_dir = os.path.join(k_root_dir, "Records-temp")
 k_reference_dir = os.path.join(k_root_dir, "References")
 # k_groundtruth_dir = os.path.join(k_root_dir, "GroundTruthMTKFormat")
 # k_comparison_hr_dir = os.path.join(k_root_dir, "ComparisonHRMTKFormat")
-k_json_dir = os.path.join(k_root_dir, "Jsons")
+k_json_dir = os.path.join(k_root_dir, "Jsons-temp")
 
 with open(os.path.join(k_root_dir, "value_descriptions.json")) as f:
     k_value_descriptions = json.load(f)
@@ -179,12 +179,14 @@ with open(os.path.join(k_root_dir, "value_descriptions.json")) as f:
 record_paths = glob(os.path.join(k_record_dir, "*.csv"))
 record_paths.sort()
 
-manual_infos = pd.read_csv(os.path.join(k_root_dir, "manual_info.csv"))
+manual_infos = pd.read_csv(os.path.join(k_root_dir, "manual_info-temp.csv"))
 
 print(manual_infos)
 
 for record_path in record_paths:
     print(record_path)
+    if record_path != "/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results/Records-temp/beizi_20210105_022.csv":
+        continue
     manual_info = manual_infos[manual_infos['file_name']
                                == record_path.split('/')[-1]].iloc[0]
     manual_info = manual_info[manual_info.notnull()]
