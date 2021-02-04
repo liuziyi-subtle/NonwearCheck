@@ -96,6 +96,9 @@ def annotate_segment(record_path, toggle_selector, manual_info):
                          error_bad_lines=False, warn_bad_lines=False,
                          verbose=False)
 
+    record = record.loc[record[0] != "APP_MSG"]
+    record[0] = record[0].astype(np.int32)
+
     acc_data_id = 2
     if 161 in record[0].values:
         print("161")
@@ -121,7 +124,8 @@ def annotate_segment(record_path, toggle_selector, manual_info):
     toggle_selector.dict_segment = {
         'record_id': toggle_selector.dict_record['id']}
 
-    fig, (ax_ppg, ax_acc) = plt.subplots(2, 1, sharex=True)
+    # fig, (ax_ppg, ax_acc) = plt.subplots(2, 1, sharex=True)
+    fig, (ax_ppg, ax_acc) = plt.subplots(2, 1)
 
     ax_ppg.plot(range(ppg.shape[0]), ppg)
     ax_ppg.set_xlim(0, ppg.shape[0] - 1)
@@ -185,8 +189,7 @@ print(manual_infos)
 
 for record_path in record_paths:
     print(record_path)
-    if record_path != "/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results/Records-temp/beizi_20210105_022.csv":
-        continue
+
     manual_info = manual_infos[manual_infos['file_name']
                                == record_path.split('/')[-1]].iloc[0]
     manual_info = manual_info[manual_info.notnull()]
