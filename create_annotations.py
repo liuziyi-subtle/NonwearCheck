@@ -171,11 +171,11 @@ generator_start = int(datetime.now().timestamp() + str2id("segment"))
 k_segment_id_generator = iter(range(generator_start, generator_start + 100000))
 
 k_root_dir = "/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/450/Results"
-k_record_dir = os.path.join(k_root_dir, "Records-temp")
+k_record_dir = os.path.join(k_root_dir, "Records")
 k_reference_dir = os.path.join(k_root_dir, "References")
 # k_groundtruth_dir = os.path.join(k_root_dir, "GroundTruthMTKFormat")
 # k_comparison_hr_dir = os.path.join(k_root_dir, "ComparisonHRMTKFormat")
-k_json_dir = os.path.join(k_root_dir, "Jsons-temp")
+k_json_dir = os.path.join(k_root_dir, "Jsons")
 
 with open(os.path.join(k_root_dir, "value_descriptions.json")) as f:
     k_value_descriptions = json.load(f)
@@ -183,7 +183,7 @@ with open(os.path.join(k_root_dir, "value_descriptions.json")) as f:
 record_paths = glob(os.path.join(k_record_dir, "*.csv"))
 record_paths.sort()
 
-manual_infos = pd.read_csv(os.path.join(k_root_dir, "manual_info-temp.csv"))
+manual_infos = pd.read_csv(os.path.join(k_root_dir, "manual_info.csv"))
 
 print(manual_infos)
 
