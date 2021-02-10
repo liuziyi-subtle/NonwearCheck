@@ -104,8 +104,8 @@ def ar_feature(df_objects):
 if __name__ == '__main__':
     '''
     usage:
-    python3 ./extract_features.py --object_path /data/data/NonwearCheck/450/Results/df_object_ppg_ir.csv \
-                                  --feature_path /data/data/NonwearCheck/450/Results/df_feat_ppg_ir.csv
+    python3 ./extract_features.py --object_path /data/data/NonwearCheck/450/Results/df_object_ppg_green.csv \
+                                  --feature_path /data/data/NonwearCheck/450/Results/df_feat_ppg_green.csv
     '''
     import argparse
     parser = argparse.ArgumentParser()
@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
     # cols2tsfresh = set(object_columns) ^ set(
     #     ['timestamp', 'wear_category_id', 'segment_id', 'id'])
-    df_tsfresh_feats = tsfresh_feats(df_objects, ['ppg_ir'])  # tsfresh特征
+    df_tsfresh_feats = tsfresh_feats(df_objects, ['ppg_g'])  # tsfresh特征
 
     # cols2angle = ['Accelerometer X', 'Accelerometer Y', 'Accelerometer Z']
     # df_angle_features = angle_feature(df_objects, cols2angle)

@@ -58,7 +58,8 @@ X_test = scaler.transform(X_test)
 D_train = xgboost.DMatrix(X_train, label=y_train)
 D_test = xgboost.DMatrix(X_test, label=y_test)
 
-params = {'max_depth': 6, 'objective': 'binary:logistic'}
+params = {'max_depth': 6, 'objective': 'binary:logistic',
+          "gpu_id": 0, "tree_method": "gpu_hist"}
 num_iter = 20
 bst_all = xgboost.train(params, D_train, num_iter, [
                         (D_train, 'train')], verbose_eval=False)
@@ -79,21 +80,21 @@ Select Features
 X_cols_candidates = top_feats
 y_col = target_col
 
-params = {'max_depth': 6, 'objective': 'binary:logistic', "n_jobs": -1}
+params = {'max_depth': 6, 'objective': 'binary:logistic',
+          "n_jobs": -1, "gpu_id": 0, "tree_method": "gpu_hist"}
 num_iter = 20
 
 accs = []
 append_feats = []
 feats_tobe_combined = ['ppg_ir__cid_ce__normalize_True',
-                       'ppg_ir__change_quantiles__f_agg_"var"__isabs_False__qh_0.6__ql_0.4',
+                       'ppg_ir__ratio_value_number_to_time_series_length',
                        'ppg_ir__number_peaks__n_1',
-                       'ppg_ir__agg_linear_trend__attr_"intercept"__chunk_len_50__f_agg_"max"',
+                       'ppg_ir__sample_entropy',
                        'ppg_ir__binned_entropy__max_bins_10',
-                       'ppg_ir__percentage_of_reoccurring_values_to_all_values',
-                       'ppg_ir__ratio_beyond_r_sigma__r_0.5',
-                       'ppg_ir__number_peaks__n_3',
-                       'ppg_ir__autocorrelation__lag_2',
-                       'ppg_ir__autocorrelation__lag_6']
+                       'ppg_ir__ar_coefficient__coeff_1__k_10',
+                       'ppg_ir__spkt_welch_density__coeff_2',
+                       'ppg_ir__max_langevin_fixed_point__m_3__r_30',
+                       'ppg_ir__permutation_entropy__dimension_5__tau_1']
 corrcoefs = []
 
 df_results = pd.DataFrame({})
@@ -104,7 +105,7 @@ segment_ids_wear = df_feats.loc[df_feats["wear_category_id"] == 0, [
     "segment_id"]]
 segment_ids_nonwear = df_feats.loc[df_feats["wear_category_id"] == 1, [
     "segment_id"]]
-kf = KFold(n_splits=20, shuffle=True, random_state=42)
+kf = KFold(n_splits=30, shuffle=True, random_state=42)
 segment_index_wear = list(kf.split(segment_ids_wear["segment_id"].unique()))
 segment_index_nonwear = list(
     kf.split(segment_ids_nonwear["segment_id"].unique()))
@@ -177,4 +178,4 @@ else:
     columns = ["append_feats"] + ["accs"]
     df_results = pd.DataFrame(df_results, columns=columns)
 
-df_results.to_csv("df_results_9feats_1231-ir.csv", index=None)
+df_results.to_csv("df_results_10feats_0205-ir.csv", index=None)
