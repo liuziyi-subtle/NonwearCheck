@@ -29,7 +29,7 @@ static float32_t k_mean;
 //   return (*(float32_t*)a > *(float32_t*)b) ? 1 : -1;
 // }
 
-float32_t _Mean(const float32_t* data, uint16_t data_length) {
+static float32_t _Mean(const float32_t* data, uint16_t data_length) {
   uint16_t count;      /*<< loop counter */
   float64_t sum = 0.0; /*<< temporary result storage */
 
@@ -46,7 +46,7 @@ float32_t _Mean(const float32_t* data, uint16_t data_length) {
   return (float32_t)mean;
 }
 
-float32_t _Variance(const float32_t* data, uint16_t data_length,
+static float32_t _Variance(const float32_t* data, uint16_t data_length,
                     uint16_t ddof) {
   uint16_t counter;    /*<< loop counter */
   float64_t sum = 0.0; /*<< temporary result storage */
@@ -256,7 +256,7 @@ static uint16_t _NumPeaks(float32_t* data, uint16_t data_length,
   return num_peaks;
 }
 
-float32_t _AutoCorrelation(const float32_t* data, uint16_t data_length,
+static float32_t _AutoCorrelation(const float32_t* data, uint16_t data_length,
                            uint8_t lag) {
   // double mean = _Mean(data, data_length);
   // // double variance = _Variance(data, data_length, 0);
@@ -343,14 +343,14 @@ static void _AggregateLinearTrend(float32_t* data, uint16_t data_length,
   float32_t ssym = _Covariance(y, y, linreg_length, y_mean, y_mean);
 
   float32_t r = ssxym / sqrtf(ssxm * ssym);
-  if (r > 1.0) {
-    r = 1.0;
-  } else if (r < -1.0) {
-    r = -1.0;
+  if (r > 1.0f) {
+    r = 1.0f;
+  } else if (r < -1.0f) {
+    r = -1.0f;
   }
 
   if (sterrest) {
-    *sterrest = sqrtf((1.0 - powf(r, 2)) * ssym / ssxm / (linreg_length - 2));
+    *sterrest = sqrtf((1.0f - powf(r, 2)) * ssym / ssxm / (linreg_length - 2));
   }
 
   if (slope) {
@@ -399,8 +399,8 @@ static float32_t _BinnedEntropy(float32_t* data, uint16_t data_length,
         count += 1u;
       }
       bin = (float32_t)count / (float32_t)data_length;
-      if (bin == .0) {
-        bin = 1.0;
+      if (bin == .0f) {
+        bin = 1.0f;
       }
       binned_entropy -= (bin * logf(bin));
 
@@ -644,7 +644,7 @@ static float _ExtractFeatsGreen(float32_t* data, uint16_t data_length,
   // printf("r2tsl: %f\n", r2tsl);
 
   /* 返回最大值, 用于基于最大值的判断条件. */
-  float32_t maxVal = q_075 + 1.5 * (q_075 - q_025);
+  float32_t maxVal = q_075 + 1.5f * (q_075 - q_025);
 
   return maxVal;
 }
@@ -734,7 +734,7 @@ static float _ExtractFeatsIR(float32_t* data, uint16_t data_length,
   // printf("reoccuring_times2all: %f\n", reoccuring_times2all);
 
   /* 返回最大值, 用于基于最大值的判断条件. */
-  float32_t maxVal = q_075 + 1.5 * (q_075 - q_025);
+  float32_t maxVal = q_075 + 1.5f * (q_075 - q_025);
 
   return maxVal;
 }
@@ -750,6 +750,7 @@ static uint8_t _Postprocess(float proba) {
 uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
   static uint8_t cPtr, rPtr;
   static uint8_t checkResults[NWC_CHECK_RESULTS_SIZE];
+  static float32_t checkProbas[NWC_CHECK_RESULTS_SIZE];
   static uint8_t ruleResults[NWC_RULE_RESULTS_SIZE];
   static uint16_t call_counter;
 
@@ -760,6 +761,7 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
     cPtr = 0u;
     for (i = 0u; i < NWC_CHECK_RESULTS_SIZE; i++) {
       checkResults[i] = 0u;
+      checkProbas[i] = .0f;
     }
 
     rPtr = 0u;
@@ -802,22 +804,38 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
     return 0u;
   }
 
-  printf("proba: %f\n", proba);
-
   /* Accept a 2-time consistant results from model */
   uint8_t checkResult = _Postprocess(proba);
-  checkResults[cPtr++] = checkResult;
+  checkResults[cPtr] = checkResult;
+  checkProbas[cPtr] = proba;
+  cPtr++;
   if (cPtr == NWC_CHECK_RESULTS_SIZE) {
     cPtr = 0u;
   }
+  
 
   uint8_t counts = 0u;
-  uint8_t min_consecutive_counts =
-      s->min_consecutive_counts >= 5u ? s->min_consecutive_counts : 5u;
+//  uint8_t min_consecutive_counts =
+//      s->min_consecutive_counts >= 5u ? s->min_consecutive_counts : 5u;
+  uint8_t min_consecutive_counts = 10u;
   uint8_t j = min_consecutive_counts;
   while (j--) {
     counts += checkResults[((int32_t)(cPtr - 1 - j) + NWC_CHECK_RESULTS_SIZE) %
                            NWC_CHECK_RESULTS_SIZE];
+  }
+
+  // UI发起测量.
+  if (s->is_from_ui) {
+    uint8_t counts_large_proba = 0u;
+    for (j = 0; j < NWC_CHECK_RESULTS_SIZE; ++j) {
+      if (checkProbas[j] > 0.9f) {
+        counts_large_proba = counts_large_proba + 1;
+      }
+    }
+
+    if (counts_large_proba >= 7u) {
+      counts = min_consecutive_counts;
+    }
   }
 
   /* Accept a 3-time consistant results from rule */
@@ -829,15 +847,6 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
     ruleCounts += ruleResults[i];
   }
   // printf("ruleCounts: %u\n", ruleCounts);
-
-  /* TODO: 优先相信极低的DC值还是优先相信模型结果 */
-  // if (counts == min_consecutive_counts) {
-  //   return counts;
-  // } else if (ruleCounts == NWC_RULE_RESULTS_SIZE) {
-  //   return 255u;
-  // } else {
-  //   return 0u;
-  // }
 
   if (ruleCounts == NWC_RULE_RESULTS_SIZE) {
     return 255u;

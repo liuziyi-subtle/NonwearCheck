@@ -26,6 +26,7 @@ typedef struct {
   int32_t* serial_number;
   uint8_t min_consecutive_counts;
   uint8_t* led;
+  uint8_t is_from_ui;
 } nwc_bioSignal_t;
 
 uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init);
