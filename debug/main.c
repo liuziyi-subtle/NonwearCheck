@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
   s.time_stamp = NULL;
   s.serial_number = 0;
   s.sensor_type = NWC_SOURCE_PPG_G;
-  s.sample_length = 12;
+  s.sample_length = 64;
 
 #if ALGO_DEBUG == 1
   // char path[1000];
@@ -132,10 +132,10 @@ int main(int argc, char **argv) {
 #else
 #include "test_data.c"
 
-  NonWearCheckToAir(NULL, 1);
-  for (i = 0u; i < test_data_length; i += 12) {
+  NonWearCheck(NULL, 1);
+  for (i = 0u; i < test_data_length; i += 64) {
     s.sig_t.signal = &test_data[i];
-    uint8_t res = NonWearCheckToAir(&s, 0);
+    uint8_t res = NonWearCheck(&s, 0);
     printf("res: %u\n", res);
   }
 

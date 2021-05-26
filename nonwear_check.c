@@ -11,7 +11,7 @@ typedef double float64_t;
 
 #define NWC_PPG_LENGTH (128u)
 #define NWC_FEATS_LENGTH (10u)
-#define NWC_PROBA_TH (0.7f)  // min prob to comfirm nonwear
+#define NWC_PROBA_TH (0.6f)  // min prob to comfirm nonwear
 #define NWC_CHECK_RESULTS_SIZE (10u)
 #define NWC_LOWER_PPG_TH_G (-5000)
 #define NWC_LOWER_PPG_TH_IR (-5000)
@@ -274,6 +274,7 @@ float32_t _AutoCorrelation(const float32_t* data, uint16_t data_length,
   }
 
   float32_t result = sum / ((data_length - (uint16_t)lag) * k_variance);
+  printf("result: %f\n", result);
 
   return result;
 }
@@ -555,33 +556,39 @@ static float _ExtractFeatsIR(float32_t* data, uint16_t data_length,
   /* First compute variance and mean to avoid repetitive computation in each
    * function. */
   k_variance = _Variance(data, (uint16_t)data_length, 0u);
-  // k_mean = _Mean(data, (uint16_t)data_length);
+  k_mean = _Mean(data, (uint16_t)data_length);
 
   /* ppg__number_peaks__n_3 */
   uint16_t num_peaks = _NumPeaks(data, data_length, 3u);
   feats[0].fvalue = (float32_t)num_peaks;
+  // printf("ppg__number_peaks__n_3: %f\n", (float32_t)num_peaks);
 
   /* ppg__number_peaks__n_10 */
   num_peaks = _NumPeaks(data, data_length, 10u);
   feats[1].fvalue = (float32_t)num_peaks;
+  // printf("ppg__number_peaks__n_10: %f\n", (float32_t)num_peaks);
 
   /* ppg__autocorrelation__lag_2 */
-  float32_t auto_correlation_lag4 = _AutoCorrelation(data, data_length, 2u);
-  feats[2].fvalue = auto_correlation_lag4;
+  float32_t autocorrelation__lag_2 = _AutoCorrelation(data, data_length, 2u);
+  feats[2].fvalue = autocorrelation__lag_2;
+  // printf("ppg__autocorrelation__lag_2: %f\n", autocorrelation__lag_2);
 
   /* ppg__agg_linear_trend__f_agg_"max"__chunk_len_50__attr_"intercept" */
   float32_t intercept = .0f;
   _AggregateLinearTrend(data, data_length, 50u, 2u, &intercept, NULL, NULL);
   feats[3].fvalue = intercept;
+  // printf("ppg__agg_linear_trend__f_agg_max__chunk_len_50__attr_intercept: %f\n", intercept);
 
   /* ppg__agg_linear_trend__f_agg_"mean"__chunk_len_10__attr_"stderr" */
   float32_t sterrest = 0.0f;
   _AggregateLinearTrend(data, data_length, 10u, 0u, NULL, &sterrest, NULL);
   feats[4].fvalue = sterrest;
+  // printf("sterrest: %f\n", sterrest);
 
   /* ppg__agg_linear_trend__f_agg_"max"__chunk_len_10__attr_"stderr" */
   _AggregateLinearTrend(data, data_length, 10u, 2u, NULL, &sterrest, NULL);
   feats[5].fvalue = sterrest;
+  // printf("sterrest: %f\n", sterrest);
 
   /* sort data. */
   float32_t* data_sorted = k_mem_pool;
@@ -599,6 +606,7 @@ static float _ExtractFeatsIR(float32_t* data, uint16_t data_length,
   /* ppg__binned_entropy__max_bins_10 */
   float32_t binned_entropy = _BinnedEntropy(data_sorted, data_length, 10u);
   feats[6].fvalue = binned_entropy;
+  // printf("binned_entropy: %f\n", binned_entropy);
 
   /*
    * ppg__change_quantiles__f_agg_"var"__isabs_False__qh_1.0__ql_0.8
@@ -610,6 +618,8 @@ static float _ExtractFeatsIR(float32_t* data, uint16_t data_length,
       _ChangeQuantile(data, data_length, q_100, q_080, true, 1u);
   feats[7].fvalue = cq_false_080_100;
   feats[8].fvalue = cq_true_080_100;
+  // printf("cq_false_080_100: %f\n", cq_false_080_100);
+  // printf("cq_true_080_100: %f\n", cq_true_080_100);
 
   /* 返回最大值, 用于基于最大值的判断条件. */
   float32_t maxVal = q_075 + 1.5 * (q_075 - q_025);
@@ -658,12 +668,16 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
   /* pull the newest values. */
   for (i = 0; i < (uint16_t)s->sample_length; ++i) {
     k_ppg[NWC_PPG_LENGTH - s->sample_length + i] =
-        (float32_t)(s->sig_t.signal[i] - 5000000) / 1000.0;
+        (float32_t)(s->sig_t.signal[i] - 4000000) / 1000.0;
   }
 
   if (call_counter < 2u) {
     return 0u;
   }
+
+  // for (i = 0; i < NWC_PPG_LENGTH; ++i) {
+  //   printf("k_ppg[%u]: %f\n", i, k_ppg[i]);
+  // }
 
   /* Model result */
   float32_t proba = .0f, maxVal = .0f;
@@ -679,9 +693,9 @@ uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init) {
     return 0u;
   }
 
-  for (i = 0; i < 9; ++i) {
-    printf("[%u]: %f\n", i, k_feats[i].fvalue);
-  }
+  // for (i = 0; i < 9; ++i) {
+  //   printf("[%u]: %f\n", i, k_feats[i].fvalue);
+  // }
   printf("proba: %f\n", proba);
 
   /* Accept a 2-time consistant results from model */
@@ -773,7 +787,7 @@ uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init) {
   /* pull the newest values. */
   for (i = 0; i < (uint16_t)s->sample_length; ++i) {
     k_ppg_air[NWC_PPG_LENGTH_AIR - s->sample_length + i] =
-        (float32_t)(s->sig_t.signal[i] - 5000000) / 1000.0;
+        (float32_t)(s->sig_t.signal[i] - 4000000) / 1000.0;
   }
 
   /* 3次之后buffer填满才能进入后续调用. */
