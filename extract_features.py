@@ -8,10 +8,10 @@ import numpy as np
 import ar
 
 
-def scale(data):
-    data = (data - 5000000) / 1000.0
-    # data = (data - 5000000) / 256
-    return data
+# def scale(data):
+#     data = (data - 5000000) / 1000.0
+#     # data = (data - 5000000) / 256
+#     return data
 
 
 def tsfresh_feats(df_objects, cols2extract):
@@ -41,44 +41,44 @@ def make_pairs(elements):
     return pairs
 
 
-def angle_feature(df_objects, cols2extract):
-    def cosine(a, b):
-        cos_angle = np.dot(a, b) / (np.sqrt(np.dot(a, a))
-                                    * np.sqrt(np.dot(b, b)))
-        return np.arccos(cos_angle)
-    print(cols2extract)
-    assert len(cols2extract) > 1, 'num of cols2extract < 2.'
-    assert 'id' in df_objects, 'id missing.'
+# def angle_feature(df_objects, cols2extract):
+#     def cosine(a, b):
+#         cos_angle = np.dot(a, b) / (np.sqrt(np.dot(a, a))
+#                                     * np.sqrt(np.dot(b, b)))
+#         return np.arccos(cos_angle)
+#     print(cols2extract)
+#     assert len(cols2extract) > 1, 'num of cols2extract < 2.'
+#     assert 'id' in df_objects, 'id missing.'
 
-    pairs = make_pairs(cols2extract)
-    cos_angle_list = []
-    for name, group in df_objects.groupby('id'):
-        cos_angles = [cosine(group[x], group[y]) for x, y in pairs]
-        cos_angle_list.append(cos_angles)
-    return pd.DataFrame(cos_angle_list, columns=[str(x) + '/' + str(y) for x, y in pairs])
+#     pairs = make_pairs(cols2extract)
+#     cos_angle_list = []
+#     for name, group in df_objects.groupby('id'):
+#         cos_angles = [cosine(group[x], group[y]) for x, y in pairs]
+#         cos_angle_list.append(cos_angles)
+#     return pd.DataFrame(cos_angle_list, columns=[str(x) + '/' + str(y) for x, y in pairs])
 
 
 def iqrs_feature(df_objects, cols2extract):
-    iqrs = df_objects.groupby('id')['ppg'].quantile(
-        q=0.75) - df_objects.groupby('id')['ppg'].quantile(q=0.25)
-    return pd.DataFrame({'ppg__iqrs': iqrs})
+    iqrs = df_objects.groupby('id')['ppg-ir'].quantile(
+        q=0.75) - df_objects.groupby('id')['ppg-ir'].quantile(q=0.25)
+    return pd.DataFrame({'ppg-ir__iqrs': iqrs})
 
 
-def successive_func(df_objects):
-    successive_feats = []
-    for obj_id in df_objects['id'].unique():
-        ppg = df_objects.loc[df_objects['id'] == obj_id, 'ppg'].values
-        ppg = [np.median(ppg[i:i+4]) for i in range(0, len(ppg), 4)]
-        f = feature_calculators.cid_ce(ppg, True)
-        successive_feats.append(f)
-    return pd.DataFrame({'ppg__successive_feats': successive_feats})
+# def successive_func(df_objects):
+#     successive_feats = []
+#     for obj_id in df_objects['id'].unique():
+#         ppg = df_objects.loc[df_objects['id'] == obj_id, 'ppg'].values
+#         ppg = [np.median(ppg[i:i+4]) for i in range(0, len(ppg), 4)]
+#         f = feature_calculators.cid_ce(ppg, True)
+#         successive_feats.append(f)
+#     return pd.DataFrame({'ppg__successive_feats': successive_feats})
 
 
 def ar_feature(df_objects):
     all_coefficients = []
     for obj_id in df_objects['id'].unique():
         obj = list(df_objects[df_objects['id'] ==
-                              obj_id]['ppg'].values)
+                              obj_id]['ppg-ir'].values)
         # print("=======")
         # print(obj)
         inputseries = ar.double_array(128)
@@ -96,7 +96,7 @@ def ar_feature(df_objects):
     df_ar = pd.DataFrame({})
     for i in range(10):
         # print("aaaa", all_coefficients[:, i])
-        df_ar['ppg__ar_{}'.format(i)] = all_coefficients[:, i]
+        df_ar['ppg-ir__ar_{}'.format(i)] = all_coefficients[:, i]
     # print(df_ar)
     return df_ar
 
@@ -104,8 +104,8 @@ def ar_feature(df_objects):
 if __name__ == '__main__':
     '''
     usage:
-    python3 ./extract_features.py --object_path /data/data/NonwearCheck/450/Results/df_object_ppg_green.csv \
-                                  --feature_path /data/data/NonwearCheck/450/Results/df_feat_ppg_green.csv
+    python3 ./extract_features.py --object_path /data/data/NonwearCheck/456/Results/df_object_ppg_ir.csv \
+                                  --feature_path /data/data/NonwearCheck/456/Results/df_feat_ppg_ir.csv
     '''
     import argparse
     parser = argparse.ArgumentParser()
@@ -117,23 +117,23 @@ if __name__ == '__main__':
 
     # df_objects['ppg'] = scale(df_objects['ppg'])
     # df_objects['ppg'] = df_objects['ppg'].astype(np.float32)
-    # df_objects = df_objects[df_objects['id'] < 50]
+    # df_objects = df_objects[df_objects['id'] < 30]
     object_columns = list(df_objects.columns)
 
     # cols2tsfresh = set(object_columns) ^ set(
     #     ['timestamp', 'wear_category_id', 'segment_id', 'id'])
-    df_tsfresh_feats = tsfresh_feats(df_objects, ['ppg_g'])  # tsfresh特征
+    df_tsfresh_feats = tsfresh_feats(df_objects, ['ppg-ir'])  # tsfresh特征
 
     # cols2angle = ['Accelerometer X', 'Accelerometer Y', 'Accelerometer Z']
     # df_angle_features = angle_feature(df_objects, cols2angle)
 
-    # df_iqrs = iqrs_feature(df_objects, ['ppg'])
+    df_iqrs = iqrs_feature(df_objects, ['ppg-ir'])
 
-    # df_ar = ar_feature(df_objects)
+    df_ar = ar_feature(df_objects)
     # df_successive = successive_func(df_objects)
 
-    # df_feats = pd.concat([df_tsfresh_feats, df_iqrs, df_ar], axis=1)
+    df_feats = pd.concat([df_tsfresh_feats, df_iqrs, df_ar], axis=1)
     # df_feats = pd.concat([df_tsfresh_feats, df_iqrs], axis=1)
-    df_feats = df_tsfresh_feats
+    # df_feats = df_tsfresh_feats
     df_feats.to_csv(args.feature_path)
     print('Done.')

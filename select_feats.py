@@ -31,11 +31,14 @@ np.set_printoptions(suppress=True)
 pd.set_option('display.max_rows', 150)
 
 df_feats = pd.read_csv(
-    "/data/data/NonwearCheck/450/Results/df_feat_ppg_ir.csv", index_col=None)
+    "/data/data/NonwearCheck/456/Results/df_feat_ppg_ir.csv", index_col=None)
 df_feats = df_feats.iloc[shuffle(range(len(df_feats)), random_state=0), :]
 
 df_objects = pd.read_csv(
-    "/data/data/NonwearCheck/450/Results/df_object_ppg_ir.csv", index_col=None)
+    "/data/data/NonwearCheck/456/Results/df_object_ppg_ir.csv", index_col=None)
+
+print('df_feats.shape: ', df_feats.shape)
+print('df_feats["segment_id"]..unique(): ', df_feats["segment_id"].unique())
 
 feats_cols = [c for c in df_feats.columns if "ppg" in c]
 target_col = "wear_category_id"
@@ -76,8 +79,28 @@ top_feats = [kv[0] for kv in key_value]
 
 """
 Select Features
+456
+'ppg-g__ar_2',
+'ppg-g__number_peaks__n_3',
+'ppg-g__autocorrelation__lag_4',
+'ppg-g__agg_linear_trend__attr_"stderr"__chunk_len_5__f_agg_"var"',
+'ppg-g__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"mean"',
+'ppg-g__binned_entropy__max_bins_10',
+'ppg-g__change_quantiles__f_agg_"mean"__isabs_True__qh_0.2__ql_0.0','ppg-g__change_quantiles__f_agg_"mean"__isabs_True__qh_1.0__ql_0.8',
+'ppg-g__change_quantiles__f_agg_"var"__isabs_True__qh_1.0__ql_0.0',
+'ppg-g__ratio_beyond_r_sigma__r_1.5'
+
+'ppg-ir__number_peaks__n_3',
+'ppg-ir__number_peaks__n_10',
+'ppg-ir__autocorrelation__lag_2',
+'ppg-ir__agg_linear_trend__attr_"intercept"__chunk_len_50__f_agg_"max"',
+'ppg-ir__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"mean"',
+'ppg-ir__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"max"',
+'ppg-ir__binned_entropy__max_bins_10',
+'ppg-ir__change_quantiles__f_agg_"var"__isabs_False__qh_1.0__ql_0.8',
+'ppg-ir__change_quantiles__f_agg_"var"__isabs_True__qh_1.0__ql_0.8'
 """
-X_cols_candidates = top_feats
+X_cols_candidates = ['ppg-ir__change_quantiles__f_agg_"var"__isabs_True__qh_1.0__ql_0.8']  # top_feats
 y_col = target_col
 
 params = {'max_depth': 6, 'objective': 'binary:logistic',
@@ -86,15 +109,16 @@ num_iter = 20
 
 accs = []
 append_feats = []
-feats_tobe_combined = ['ppg_ir__cid_ce__normalize_True',
-                       'ppg_ir__ratio_value_number_to_time_series_length',
-                       'ppg_ir__number_peaks__n_1',
-                       'ppg_ir__sample_entropy',
-                       'ppg_ir__binned_entropy__max_bins_10',
-                       'ppg_ir__ar_coefficient__coeff_1__k_10',
-                       'ppg_ir__spkt_welch_density__coeff_2',
-                       'ppg_ir__max_langevin_fixed_point__m_3__r_30',
-                       'ppg_ir__permutation_entropy__dimension_5__tau_1']
+feats_tobe_combined = [
+    'ppg-ir__number_peaks__n_3',
+    'ppg-ir__number_peaks__n_10',
+    'ppg-ir__autocorrelation__lag_2',
+    'ppg-ir__agg_linear_trend__attr_"intercept"__chunk_len_50__f_agg_"max"',
+    'ppg-ir__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"mean"',
+    'ppg-ir__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"max"',
+    'ppg-ir__binned_entropy__max_bins_10',
+    'ppg-ir__change_quantiles__f_agg_"var"__isabs_False__qh_1.0__ql_0.8'
+    ]
 corrcoefs = []
 
 df_results = pd.DataFrame({})
@@ -105,7 +129,7 @@ segment_ids_wear = df_feats.loc[df_feats["wear_category_id"] == 0, [
     "segment_id"]]
 segment_ids_nonwear = df_feats.loc[df_feats["wear_category_id"] == 1, [
     "segment_id"]]
-kf = KFold(n_splits=30, shuffle=True, random_state=42)
+kf = KFold(n_splits=70, shuffle=True, random_state=42)
 segment_index_wear = list(kf.split(segment_ids_wear["segment_id"].unique()))
 segment_index_nonwear = list(
     kf.split(segment_ids_nonwear["segment_id"].unique()))
@@ -114,7 +138,7 @@ for (train_index_wear, test_index_wear), (train_index_nonwear, test_index_nonwea
     test_ids_wear = segment_ids_wear.values[test_index_wear]
     test_ids_nonwear = segment_ids_nonwear.values[test_index_nonwear]
     test_ids_list.append(np.concatenate([test_ids_wear, test_ids_nonwear]))
-print("len(test_ids_list)", len(test_ids_list))
+print('df_feats["segment_id"].unique().shape', df_feats["segment_id"].unique().shape)
 
 for f in X_cols_candidates:
     combined_feats = feats_tobe_combined.copy()
@@ -129,7 +153,7 @@ for f in X_cols_candidates:
 
     for test_ids in test_ids_list:
         test_index = np.in1d(df_feats["segment_id"], test_ids)
-        # print("test_index: ", test_index)
+        print("~test_index: ", ~test_index)
         X_train, y_train = df_feats.loc[~test_index,
                                         combined_feats].values, df_feats.loc[~test_index, y_col].values
         X_test,  y_test = df_feats.loc[test_index,
@@ -145,7 +169,7 @@ for f in X_cols_candidates:
         bst = xgboost.train(params, D_train, num_iter, [
                             (D_train, 'train')], verbose_eval=False)
         probs = bst.predict(D_test)
-        preds = np.array(probs) > 0.7
+        preds = np.array(probs) > 0.6
 
         y_preds_list.extend(preds)
         y_test_list.extend(list(y_test))
@@ -178,4 +202,4 @@ else:
     columns = ["append_feats"] + ["accs"]
     df_results = pd.DataFrame(df_results, columns=columns)
 
-df_results.to_csv("df_results_10feats_0205-ir.csv", index=None)
+df_results.to_csv("df_results_10feats_0526-ir.csv", index=None)

@@ -60,6 +60,8 @@ def create_object(record_annotation,
     # read mtk format record.
     record = pd.read_csv(os.path.join(record_dir, record_annotation['name']),
                          header=None, error_bad_lines=False)
+    record = record.loc[record[0] != "APP_MSG"]
+    record[0] = record[0].astype(np.int32)
 
     # downsample to target_fs
     record = record.iloc[::int(value_category["sample_rate"] / target_fs), :]
@@ -85,8 +87,9 @@ def create_object(record_annotation,
             record['AccX'], 2) + np.power(record['AccY'], 2) + np.power(record['AccZ'], 2)
     else:
         record = record.loc[record[0] ==
-                            value_category['id'], [1]].astype(np.uint16)
+                            value_category['id'], [1]].astype(np.int32)
         record.rename(columns={1: value_category["value_type"]}, inplace=True)
+        record[value_category["value_type"]] = (record[value_category["value_type"]] - 4000000) / 1000.0
 
     object_list = []
     for segment_annotation in annotation_list:
@@ -102,6 +105,7 @@ def create_object(record_annotation,
         objects = segment2object(
             segment, object_length, overlap=int(object_length/2))
         object_list.extend(objects)
+    print(object_list)
     return object_list
 
 
@@ -113,11 +117,11 @@ python3 create_datasets.py --annotations_path /Users/liuziyi/Documents/Lifesense
                            --groundtruth_dir /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/GroundTruthMTKFormat \
                            --object_length 200 \
                            --save_path /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/df_object_acc.csv
-python3 create_dataset.py --annotations_path /data/data/NonwearCheck/450/Results/annotations.json \
-                          --value_category_id 164 \
-                          --record_dir /data/data/NonwearCheck/450/Results/Records \
+python3 create_dataset.py --annotations_path /data/data/NonwearCheck/456/Results/annotations.json \
+                          --value_category_id 4 \
+                          --record_dir /data/data/NonwearCheck/456/Results/Records \
                           --object_length 128 \
-                          --save_path /data/data/NonwearCheck/450/Results/df_object_ppg_ir.csv
+                          --save_path /data/data/NonwearCheck/456/Results/df_object_ppg_ir.csv
 """
 
 if __name__ == '__main__':
