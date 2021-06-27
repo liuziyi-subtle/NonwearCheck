@@ -16,7 +16,7 @@ typedef struct {
   int32_t sample_length;
   uint32_t* time_stamp;
   union {
-    int32_t* signal;
+    int32_t* signal;  // float* signal;
     struct {
       int32_t* x;
       int32_t* y;
@@ -30,6 +30,6 @@ typedef struct {
 
 uint8_t NonWearCheck(nwc_bioSignal_t* s, bool init);
 
-uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init);
+// uint8_t NonWearCheckToAir(nwc_bioSignal_t* s, bool init);
 
 #endif /* __NONWEAR_CHECK_H__ */
