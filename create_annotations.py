@@ -85,6 +85,9 @@ def annotate_segment(record_path, toggle_selector, manual_info):
                          verbose=False)
 
     record = record.loc[record[0] != "APP_MSG"]
+    record = record.loc[record[0] != "200"]
+    record = record.loc[record[0] != "225"]
+    record = record.loc[record[0] != "224"]
     record[0] = record[0].astype(np.int32)
 
     ppg_sample_rate = 50  # 本次数据green和ir的采样率均为50Hz.
@@ -151,17 +154,15 @@ k_record_id_generator = iter(range(generator_start, generator_start + 100000))
 generator_start = int(datetime.now().timestamp() + str2id("segment"))
 k_segment_id_generator = iter(range(generator_start, generator_start + 100000))
 
-k_root_dir = "/Users/liuziyi/Documents/Lifesense/Data/NonwearCheck/456/Results"
+k_root_dir = "/Users/liuziyi/439/Results"
 k_record_dir = os.path.join(k_root_dir, "Records")
 k_reference_dir = os.path.join(k_root_dir, "References")
-# k_groundtruth_dir = os.path.join(k_root_dir, "GroundTruthMTKFormat")
-# k_comparison_hr_dir = os.path.join(k_root_dir, "ComparisonHRMTKFormat")
 k_json_dir = os.path.join(k_root_dir, "Jsons")
 
-with open(os.path.join(k_root_dir, "value_descriptions.json")) as f:
+with open(os.path.join(k_root_dir, "value_description.json")) as f:
     k_value_descriptions = json.load(f)
 
-record_paths = glob(os.path.join(k_record_dir, "*.dat"))
+record_paths = glob(os.path.join(k_record_dir, "*.csv"))
 record_paths.sort()
 
 manual_infos = pd.read_csv(os.path.join(k_root_dir, "manual_info.csv"))
