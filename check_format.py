@@ -11,7 +11,7 @@ k_root_dir = "/Users/liuziyi/439/Results"
 #     lambda x: x.split(".")[0] + ".csv")
 # manual_info.to_csv("./manual_info_new.csv", encoding='utf_8_sig', index=None)
 
-record_paths = glob(os.path.join(k_root_dir, "Records/*.dat"))
+record_paths = glob(os.path.join(k_root_dir, "Records/*.csv"))
 for rp in record_paths:
     record = pd.read_csv(rp, header=None, error_bad_lines=False,
                          warn_bad_lines=False, verbose=False)
@@ -30,5 +30,5 @@ for rp in record_paths:
                     record = pd.read_csv(rp, header=None, error_bad_lines=False,
                                          warn_bad_lines=False, verbose=False, skiprows=4)
 
-    rp = rp.replace("Records", "Records-new").replace(".dat", ".csv")
+    rp = rp.replace("Records", "Records-new")  # .replace(".dat", ".csv")
     record.to_csv(rp, index=None, header=None)
