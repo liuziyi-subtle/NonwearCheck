@@ -3,7 +3,7 @@ from glob import glob
 import os
 import shutil
 
-k_root_dir = "/Users/liuziyi/439/Results"
+k_root_dir = "/Users/liuziyi/Desktop/Temp/439-temp"
 
 # modify all file_name as  *.csv
 # manual_info = pd.read_csv("./manual_info.csv")

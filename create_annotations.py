@@ -154,7 +154,7 @@ k_record_id_generator = iter(range(generator_start, generator_start + 100000))
 generator_start = int(datetime.now().timestamp() + str2id("segment"))
 k_segment_id_generator = iter(range(generator_start, generator_start + 100000))
 
-k_root_dir = "/Users/liuziyi/439/Results"
+k_root_dir = "/Users/liuziyi/Desktop/Temp/439-temp"
 k_record_dir = os.path.join(k_root_dir, "Records")
 k_reference_dir = os.path.join(k_root_dir, "References")
 k_json_dir = os.path.join(k_root_dir, "Jsons")
