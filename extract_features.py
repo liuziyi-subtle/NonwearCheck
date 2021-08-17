@@ -8,10 +8,10 @@ import numpy as np
 import ar
 
 
-# def scale(data):
-#     data = (data - 5000000) / 1000.0
-#     # data = (data - 5000000) / 256
-#     return data
+def scale(data):
+    data = (data - 5000000) / 1000.0
+    # data = (data - 5000000) / 256
+    return data
 
 
 def tsfresh_feats(df_objects, cols2extract):
@@ -67,7 +67,7 @@ def iqrs_feature(df_objects, cols2extract):
 # def successive_func(df_objects):
 #     successive_feats = []
 #     for obj_id in df_objects['id'].unique():
-#         ppg = df_objects.loc[df_objects['id'] == obj_id, 'ppg'].values
+#         ppg = df_objects.loc[df_objects['id'] == obj_id, 'ppg-ir'].values
 #         ppg = [np.median(ppg[i:i+4]) for i in range(0, len(ppg), 4)]
 #         f = feature_calculators.cid_ce(ppg, True)
 #         successive_feats.append(f)
@@ -104,8 +104,8 @@ def ar_feature(df_objects):
 if __name__ == '__main__':
     '''
     usage:
-    python3 ./extract_features.py --object_path /data/data/NonwearCheck/456/Results/df_object_ppg_ir.csv \
-                                  --feature_path /data/data/NonwearCheck/456/Results/df_feat_ppg_ir.csv
+    python3 ./extract_features.py --object_path /data/Results/df_object_ppg_ir.csv \
+                                  --feature_path /data/Results/df_feat_ppg_ir.csv
     '''
     import argparse
     parser = argparse.ArgumentParser()
@@ -115,8 +115,8 @@ if __name__ == '__main__':
 
     df_objects = pd.read_csv(args.object_path)
 
-    # df_objects['ppg'] = scale(df_objects['ppg'])
-    # df_objects['ppg'] = df_objects['ppg'].astype(np.float32)
+    df_objects['ppg-ir'] = scale(df_objects['ppg-ir'])
+    # df_objects['ppg-ir'] = df_objects['ppg-ir'].astype(np.float32)
     # df_objects = df_objects[df_objects['id'] < 30]
     object_columns = list(df_objects.columns)
 

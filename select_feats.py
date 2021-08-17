@@ -31,14 +31,14 @@ np.set_printoptions(suppress=True)
 pd.set_option('display.max_rows', 150)
 
 df_feats = pd.read_csv(
-    "/data/data/NonwearCheck/456/Results/df_feat_ppg_ir.csv", index_col=None)
+    "/data/Results/df_feat_ppg_ir.csv", index_col=None)
 df_feats = df_feats.iloc[shuffle(range(len(df_feats)), random_state=0), :]
 
 df_objects = pd.read_csv(
-    "/data/data/NonwearCheck/456/Results/df_object_ppg_ir.csv", index_col=None)
+    "/data/Results/df_object_ppg_ir.csv", index_col=None)
 
 print('df_feats.shape: ', df_feats.shape)
-print('df_feats["segment_id"]..unique(): ', df_feats["segment_id"].unique())
+print('df_feats["segment_id"].unique(): ', df_feats["segment_id"].unique())
 
 feats_cols = [c for c in df_feats.columns if "ppg" in c]
 target_col = "wear_category_id"
@@ -131,8 +131,10 @@ segment_ids_nonwear = df_feats.loc[df_feats["wear_category_id"] == 1, [
     "segment_id"]]
 kf = KFold(n_splits=70, shuffle=True, random_state=42)
 segment_index_wear = list(kf.split(segment_ids_wear["segment_id"].unique()))
+# print('segment_ids_wear["segment_id"].unique(): ', len(segment_ids_wear["segment_id"].unique()))
 segment_index_nonwear = list(
     kf.split(segment_ids_nonwear["segment_id"].unique()))
+# print('segment_ids_nonwear["segment_id"].unique(): ', len(segment_ids_nonwear["segment_id"].unique()))
 test_ids_list = []
 for (train_index_wear, test_index_wear), (train_index_nonwear, test_index_nonwear) in zip(segment_index_wear, segment_index_nonwear):
     test_ids_wear = segment_ids_wear.values[test_index_wear]
@@ -153,7 +155,7 @@ for f in X_cols_candidates:
 
     for test_ids in test_ids_list:
         test_index = np.in1d(df_feats["segment_id"], test_ids)
-        print("~test_index: ", ~test_index)
+        print("~test_index: ", np.sum(~test_index), np.sum(test_index))
         X_train, y_train = df_feats.loc[~test_index,
                                         combined_feats].values, df_feats.loc[~test_index, y_col].values
         X_test,  y_test = df_feats.loc[test_index,
@@ -202,4 +204,4 @@ else:
     columns = ["append_feats"] + ["accs"]
     df_results = pd.DataFrame(df_results, columns=columns)
 
-df_results.to_csv("df_results_10feats_0526-ir.csv", index=None)
+df_results.to_csv("df_results_10feats_0816-ir.csv", index=None)

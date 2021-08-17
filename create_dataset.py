@@ -89,7 +89,7 @@ def create_object(record_annotation,
         record = record.loc[record[0] ==
                             value_category['id'], [1]].astype(np.int32)
         record.rename(columns={1: value_category["value_type"]}, inplace=True)
-        record[value_category["value_type"]] = (record[value_category["value_type"]] - 4000000) / 1000.0
+        # record[value_category["value_type"]] = (record[value_category["value_type"]] - 5000000) / 1000.0
 
     object_list = []
     for segment_annotation in annotation_list:
@@ -111,17 +111,11 @@ def create_object(record_annotation,
 
 """
 usage:
-python3 create_datasets.py --annotations_path /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/annotations.json \
-                           --value_category_id 2 \
-                           --record_dir /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/RecordsMTKFormat \
-                           --groundtruth_dir /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/GroundTruthMTKFormat \
-                           --object_length 200 \
-                           --save_path /Users/liuziyi/Documents/Lifesense/Data/HeartRate/GoodixDemoWatch/Results/df_object_acc.csv
-python3 create_dataset.py --annotations_path /data/data/NonwearCheck/456/Results/annotations.json \
+python3 create_dataset.py --annotations_path /data/Results/annotations.json \
                           --value_category_id 4 \
-                          --record_dir /data/data/NonwearCheck/456/Results/Records \
+                          --record_dir /data/Results/Records \
                           --object_length 128 \
-                          --save_path /data/data/NonwearCheck/456/Results/df_object_ppg_ir.csv
+                          --save_path /data/Results/df_object_ppg_ir.csv
 """
 
 if __name__ == '__main__':
