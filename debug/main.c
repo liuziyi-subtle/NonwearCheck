@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
   nwc_bioSignal_t s;
   s.time_stamp = NULL;
   s.serial_number = 0;
-  s.sensor_type = NWC_SOURCE_PPG_IR;
+  s.sensor_type = NWC_SOURCE_PPG_G;
   s.sample_length = 64;
 
 #if ALGO_DEBUG == 1

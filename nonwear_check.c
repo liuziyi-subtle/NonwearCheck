@@ -10,7 +10,7 @@ typedef float float32_t;
 typedef double float64_t;
 
 #define NWC_PPG_LENGTH (128u)
-#define NWC_FEATS_LENGTH (10u)
+#define NWC_FEATS_LENGTH (16u)
 #define NWC_PROBA_TH (0.6f)  // min prob to comfirm nonwear
 #define NWC_CHECK_RESULTS_SIZE (10u)
 #define NWC_LOWER_PPG_TH_G (-5000)
@@ -25,9 +25,9 @@ static float32_t k_mem_pool[256u];
 static float32_t k_variance;
 static float32_t k_mean;
 
-// static inline int _CmpFunc(const void* a, const void* b) {
-//   return (*(float32_t*)a > *(float32_t*)b) ? 1 : -1;
-// }
+static uint8_t k_ind_set[128] = {0};
+static uint8_t k_inc_set[128] = {0};
+
 
 float32_t _Mean(const float32_t* data, uint16_t data_length) {
   uint16_t count;      /*<< loop counter */
@@ -390,25 +390,34 @@ static float32_t _BinnedEntropy(float32_t* data, uint16_t data_length,
 
   float32_t binned_entropy = 0.0;
   float32_t* p = data;
-  uint16_t count = 1u;
-  float32_t bin_edge = min + bin_range;
+  uint16_t count = 0u;
+  float32_t left_edge = min, right_edge = min + bin_range;
 
-  while (p++ < &data[data_length - 1]) {
-    if ((*p >= bin_edge) || (p == &data[data_length - 1])) {
-      /* the last bin include the right edge. */
+  while (p <= &data[data_length - 1]) {    
+    if ((*p >= left_edge) && (*p < right_edge)) {
+      // printf("left_edge: %f, right_edge: %f\n", left_edge, right_edge);
+      count++;
+      p++;
+    } else {
       if (p == &data[data_length - 1]) {
-        count += 1u;
+        p++;  /*<< make sure to quit loop.  */
+        count++;
       }
+      // printf("count: %u\n", count);
+
       bin = (float32_t)count / (float32_t)data_length;
       if (bin == .0) {
         bin = 1.0;
       }
       binned_entropy -= (bin * logf(bin));
+      
+      left_edge = right_edge;
+      right_edge += bin_range;
+      if (right_edge > max) {
+        right_edge = max;
+      }
 
-      bin_edge += bin_range;
-      count = 1u;
-    } else {
-      count++;
+      count = 0;
     }
   }
 
@@ -457,6 +466,206 @@ static float32_t _ChangeQuantile(float32_t* data, uint16_t data_length,
   }
 }
 
+
+float32_t LempelZivComplexity(float32_t* data, uint16_t data_length, uint16_t num_bins) {
+  uint16_t i, j;
+  
+  float32_t val_max = data[0], val_min = data[0];
+  for (i = 0; i < data_length; ++i) {
+    if (data[i] > val_max) {
+      val_max = data[i];
+    }
+
+    if (data[i] < val_min) {
+      val_min = data[i];
+    }
+  }
+  float32_t interval = (val_max - val_min) / (double)(num_bins - 1);
+
+  /* Get bins with the length of num_bins. */
+  float32_t *bins = k_mem_pool;
+  uint8_t bins_length = 0u;
+  while (bins_length < num_bins) {
+    bins[bins_length++] = val_min + interval * bins_length;
+  }
+
+  /* Get sequence. */
+  float32_t *sequence = bins + bins_length;
+  uint16_t sequence_length = 0;
+  for (i = 0; i < data_length; ++i) {
+    for (j = 0; j < bins_length; ++j) {
+      if (data[i] <= bins[j]) {
+        sequence[sequence_length++] = j;
+        break;
+      } else if (data[i] > bins[bins_length - 1]) {
+        sequence[sequence_length++] = bins_length;
+        break;
+      }
+    }
+  }
+
+  uint8_t *ind_set = k_ind_set;
+  uint8_t *inc_set = k_inc_set;
+  uint8_t ind_set_len = 0;
+  uint16_t ind = 0, inc = 1;
+  while (ind + inc < sequence_length) {
+    uint8_t flag = 0;
+
+    for (i = 0; i < ind_set_len; ++i) {
+      uint8_t num_matched = 0;
+      if (inc == inc_set[i]) {
+        for (j = 0; j < inc; ++j) {
+          if (sequence[ind + j] == sequence[ind_set[i] + j]) {
+            num_matched++;
+          }
+        }
+
+        if (num_matched == inc) {
+          flag = 1;
+        }
+      }
+    }
+
+    if (flag) {
+      inc++;
+    } else {
+      ind_set[ind_set_len] = ind;
+      inc_set[ind_set_len] = inc;
+      ind_set_len++;
+
+      ind = ind + inc;
+      inc = 1;
+    }
+  }
+
+  return (float32_t)ind_set_len / (float32_t)sequence_length;
+}
+
+
+uint16_t LongestStrikeAboveMean(float32_t *data, uint16_t data_length) {
+  uint16_t longest_strike = 0, longest_strike_temp = 0;
+  float32_t *p = data, *q = data;
+  
+  while (q <= &data[data_length - 1]) {
+    if ((*p > k_mean) && (*q > k_mean)) {
+      longest_strike_temp += 1;
+      q++;
+    } else {
+      p = q + 1;
+      q = p;
+      longest_strike_temp = 0;
+    }
+
+    if (longest_strike_temp > longest_strike) {
+      longest_strike = longest_strike_temp;
+    }
+  }
+
+  return longest_strike;
+}
+
+
+typedef struct _value2index 
+{
+  float32_t value;
+  int32_t index;
+} value2index;
+
+static int CmpValue(const void *a, const void *b)
+{
+  if (((value2index*)a)->value - ((value2index*)b)->value > 0)
+  {
+    return 1;
+  }
+  else
+  {
+    return -1;
+  }
+}
+
+static value2index src[5];
+static value2index dst[5];
+
+float32_t PermutationEntropy(float32_t *data, uint16_t data_length, uint8_t tau, uint8_t dimension) {
+  uint16_t i, j, k;
+
+  uint8_t* ind_set = k_ind_set;
+  uint8_t ind_set_len = 0;
+
+  uint8_t* num_set = k_inc_set;
+  uint8_t num_set_len = 0;
+  
+  for (i = 0; i < 128; ++i) {
+    ind_set[i] = 1;
+    num_set[i] = 0;
+  }
+
+  for (i = 0; i < data_length - dimension + 1; ++i) {
+    if (ind_set[i] == 0) {
+      continue;
+    }
+
+    uint8_t counter = 1;
+    ind_set[i] = 0;
+
+    /* np.argsort(np.argsort(X)). */
+    for (k = 0; k < 5; ++k) {
+      src[k].index = k;
+      src[k].value = data[i + k];
+    }
+    qsort(src, 5, sizeof(value2index), CmpValue);
+    for (k = 0; k < 5; ++k) {
+      src[k].value = src[k].index;
+      src[k].index = k;
+    }
+    qsort(src, 5, sizeof(value2index), CmpValue);
+
+    // printf("\n");
+    // for (k = 0; k < 5; ++k) {
+    //   printf("%d, ", src[k].index);
+    // }
+
+    for (j = i + 1; j < data_length - dimension + 1; ++j) {
+      if (ind_set[j] == 0) {
+        continue;
+      }
+      
+      for (k = 0; k < 5; ++k) {
+        dst[k].index = k;
+        dst[k].value = data[j + k];
+      }
+      qsort(dst, 5, sizeof(value2index), CmpValue);
+      for (k = 0; k < 5; ++k) {
+        dst[k].value = dst[k].index;
+        dst[k].index = k;
+      }
+      qsort(dst, 5, sizeof(value2index), CmpValue);
+
+      uint8_t num_mapped = 0;
+      for (k = 0; k < 5; ++k) {
+        if (src[k].index == dst[k].index) {
+          num_mapped += 1;
+        }
+      }
+
+      if (num_mapped == 5) {
+        ind_set[j] = 0;
+        counter++;
+      }
+    }
+
+    num_set[num_set_len++] = counter;
+  }
+
+  float32_t sum = .0f;
+  for (i = 0; i < num_set_len; ++i) {
+    float32_t prob = (float32_t)num_set[i] / (data_length - dimension + 1);
+    sum = sum + prob * logf(prob);
+  }
+
+  return -sum;
+}
+
 static void _SortFunc(float32_t* data, uint16_t data_length) {
   float32_t temp;
   uint32_t i, j;
@@ -499,41 +708,57 @@ static float _ExtractFeatsGreen(float32_t* data, uint16_t data_length,
   feats[2].fvalue = auto_correlation_lag4;
   printf("ppg__autocorrelation__lag_4: %f\n", feats[2].fvalue);
 
-  /* ppg__agg_linear_trend__f_agg_"var"__chunk_len_5__attr_"stderr" */
+  /* ppg-g__agg_linear_trend__attr_"stderr"__chunk_len_5__f_agg_"var" */
   float32_t sterrest = .0f;
   _AggregateLinearTrend(data, data_length, 5u, 1u, NULL, &sterrest, NULL);
   feats[3].fvalue = sterrest;
   printf("ppg__agg_linear_trend__f_agg_var__chunk_len_5__attr_stderr: %f\n", feats[3].fvalue);
 
-  /* ppg__agg_linear_trend__f_agg_"mean"__chunk_len_10__attr_"stderr" */
+  /* ppg-g__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"mean" */
   _AggregateLinearTrend(data, data_length, 10u, 0u, NULL, &sterrest, NULL);
   feats[4].fvalue = sterrest;
   printf("ppg__agg_linear_trend__f_agg_mean__chunk_len_10__attr_stderr: %f\n", feats[4].fvalue);
+
+  /* ppg-g__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"max" */
+  _AggregateLinearTrend(data, data_length, 10u, 2u, NULL, &sterrest, NULL);
+  feats[5].fvalue = sterrest;
+  printf("ppg-g__agg_linear_trend__attr_stderr__chunk_len_10__f_agg_max: %f\n", feats[5].fvalue);
+
+  /* ppg-g__permutation_entropy__dimension_5__tau_1 */
+  float32_t permutation_entropy= PermutationEntropy(data, data_length, 1u, 5u);
+  feats[6].fvalue = permutation_entropy;
+  printf("ppg-g__permutation_entropy__dimension_5__tau_1: %f\n", feats[6].fvalue);
+
+  /* ppg-g__lempel_ziv_complexity__bins_100 */
+  float32_t lempel_ziv_complexity = LempelZivComplexity(data, data_length, 100u);
+  feats[7].fvalue = lempel_ziv_complexity;
+  printf("ppg-g__lempel_ziv_complexity__bins_100: %f\n", feats[7].fvalue);  
 
   /* sort data. */
   float32_t* data_sorted = k_mem_pool;
   for (i = 0u; i < data_length; ++i) {
     data_sorted[i] = data[i];
   }
-  // qsort(data_sorted, data_length, sizeof(float32_t), _CmpFunc);
   _SortFunc(data_sorted, data_length);
 
   float32_t q_000 = data_sorted[0];
   float32_t q_020 = _Quantile(data_sorted, data_length, 0.20);
   float32_t q_025 = _Quantile(data_sorted, data_length, 0.25);
+  float32_t q_040 = _Quantile(data_sorted, data_length, 0.40);
   float32_t q_075 = _Quantile(data_sorted, data_length, 0.75);
   float32_t q_080 = _Quantile(data_sorted, data_length, 0.80);
   float32_t q_100 = data_sorted[data_length - 1];
 
   /* ppg__binned_entropy__max_bins_10 */
   float32_t binned_entropy = _BinnedEntropy(data_sorted, data_length, 10u);
-  feats[5].fvalue = binned_entropy;
-  printf("ppg__binned_entropy__max_bins_10: %f\n", feats[5].fvalue);
+  feats[8].fvalue = binned_entropy;
+  printf("ppg__binned_entropy__max_bins_10: %f\n", binned_entropy);
 
   /*
-   * ppg__change_quantiles__f_agg_"mean"__isabs_True__qh_0.2__ql_0.0
-   * ppg__change_quantiles__f_agg_"mean"__isabs_True__qh_1.0__ql_0.8
-   * ppg__change_quantiles__f_agg_"var"__isabs_True__qh_1.0__ql_0.0
+   * ppg-g__change_quantiles__f_agg_"mean"__isabs_True__qh_0.2__ql_0.0
+   * ppg-g__change_quantiles__f_agg_"mean"__isabs_True__qh_1.0__ql_0.8
+   * ppg-g__change_quantiles__f_agg_"var"__isabs_True__qh_1.0__ql_0.0
+   * ppg-g__change_quantiles__f_agg_"mean"__isabs_True__qh_0.8__ql_0.4
    */
   float32_t cq_000_020 =
       _ChangeQuantile(data, data_length, q_020, q_000, true, 0u);
@@ -541,17 +766,27 @@ static float _ExtractFeatsGreen(float32_t* data, uint16_t data_length,
       _ChangeQuantile(data, data_length, q_100, q_080, true, 0u);
   float32_t cq_000_100 =
       _ChangeQuantile(data, data_length, q_100, q_000, true, 1u);
-  feats[6].fvalue = cq_000_020;
-  feats[7].fvalue = cq_080_100;
-  feats[8].fvalue = cq_000_100;
-  printf("ppg__change_quantiles__f_agg_mean__isabs_True__qh_0.2__ql_0.0: %f\n", feats[6].fvalue);
-  printf("ppg__change_quantiles__f_agg_mean__isabs_True__qh_1.0__ql_0.8: %f\n", feats[7].fvalue);
-  printf("ppg__change_quantiles__f_agg_var__isabs_True__qh_1.0__ql_0.0: %f\n", feats[8].fvalue);
+  float32_t cq_080_040 =
+      _ChangeQuantile(data, data_length, q_080, q_040, true, 0u);
+  feats[9].fvalue = cq_000_020;
+  feats[10].fvalue = cq_080_100;
+  feats[11].fvalue = cq_000_100;
+  feats[12].fvalue = cq_080_040;
+  printf("ppg-g__change_quantiles__f_agg_mean__isabs_True__qh_0.2__ql_0.0: %f\n", feats[9].fvalue);
+  printf("ppg-g__change_quantiles__f_agg_mean__isabs_True__qh_1.0__ql_0.8: %f\n", feats[10].fvalue);
+  printf("ppg-g__change_quantiles__f_agg_var__isabs_True__qh_1.0__ql_0.0: %f\n", feats[11].fvalue);
+  printf("ppg-g__change_quantiles__f_agg_mean__isabs_True__qh_0.8__ql_0.4: %f\n", feats[12].fvalue);
 
   /* ppg__ratio_beyond_r_sigma__r_1.5 */
   float32_t ratio_beyond_r_sigma = _RatioBeyondSigma(data, data_length, 1.5f);
-  feats[9].fvalue = ratio_beyond_r_sigma;
-  printf("ppg__ratio_beyond_r_sigma__r_1.5: %f\n", feats[9].fvalue);
+  feats[13].fvalue = ratio_beyond_r_sigma;
+  printf("ppg__ratio_beyond_r_sigma__r_1.5: %f\n", feats[13].fvalue);
+
+  /* ppg-g__minimum */
+  float32_t minimum = q_000;
+  feats[14].fvalue = minimum;
+  printf("ppg__minimum: %f\n", feats[14].fvalue);  
+
 
   /* 返回最大值, 用于基于最大值的判断条件. */
   float32_t maxVal = q_075 + 1.5 * (q_075 - q_025);
@@ -568,37 +803,62 @@ static float _ExtractFeatsIR(float32_t* data, uint16_t data_length,
   k_variance = _Variance(data, (uint16_t)data_length, 0u);
   k_mean = _Mean(data, (uint16_t)data_length);
 
-  /* ppg__number_peaks__n_3 */
+  /* ppg-ir__number_peaks__n_3 */
   uint16_t num_peaks = _NumPeaks(data, data_length, 3u);
   feats[0].fvalue = (float32_t)num_peaks;
-  printf("ppg__number_peaks__n_3: %f\n", (float32_t)num_peaks);
+  printf("ppg-ir__number_peaks__n_3: %f\n", feats[0].fvalue);
 
-  /* ppg__number_peaks__n_10 */
+  /* ppg-ir__number_peaks__n_10 */
   num_peaks = _NumPeaks(data, data_length, 10u);
   feats[1].fvalue = (float32_t)num_peaks;
-  printf("ppg__number_peaks__n_10: %f\n", (float32_t)num_peaks);
+  printf("ppg-ir__number_peaks__n_10: %f\n", feats[1].fvalue);
 
-  /* ppg__autocorrelation__lag_2 */
+  /* ppg-ir__autocorrelation__lag_2 */
   float32_t autocorrelation__lag_2 = _AutoCorrelation(data, data_length, 2u);
   feats[2].fvalue = autocorrelation__lag_2;
-  printf("ppg__autocorrelation__lag_2: %f\n", autocorrelation__lag_2);
+  printf("ppg-ir__autocorrelation__lag_2: %f\n", feats[2].fvalue);
 
-  /* ppg__agg_linear_trend__f_agg_"max"__chunk_len_50__attr_"intercept" */
+  /* ppg-ir__agg_linear_trend__attr_"intercept"__chunk_len_50__f_agg_"max" */
   float32_t intercept = .0f;
   _AggregateLinearTrend(data, data_length, 50u, 2u, &intercept, NULL, NULL);
   feats[3].fvalue = intercept;
-  printf("ppg__agg_linear_trend__f_agg_max__chunk_len_50__attr_intercept: %f\n", intercept);
+  printf("ppg-ir__agg_linear_trend__attr_intercept__chunk_len_50__f_agg_max: %f\n", feats[3].fvalue);
 
-  /* ppg__agg_linear_trend__f_agg_"mean"__chunk_len_10__attr_"stderr" */
+  /* ppg-ir__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"mean" */
   float32_t sterrest = 0.0f;
   _AggregateLinearTrend(data, data_length, 10u, 0u, NULL, &sterrest, NULL);
   feats[4].fvalue = sterrest;
-  printf("sterrest: %f\n", sterrest);
+  printf("ppg-ir__agg_linear_trend__attr_stderr__chunk_len_10__f_agg_mean: %f\n", feats[4].fvalue);
 
-  /* ppg__agg_linear_trend__f_agg_"max"__chunk_len_10__attr_"stderr" */
+  /* ppg-ir__agg_linear_trend__attr_"stderr"__chunk_len_10__f_agg_"max" */
   _AggregateLinearTrend(data, data_length, 10u, 2u, NULL, &sterrest, NULL);
   feats[5].fvalue = sterrest;
-  printf("sterrest: %f\n", sterrest);
+  printf("ppg-ir__agg_linear_trend__attr_stderr__chunk_len_10__f_agg_max: %f\n", feats[5].fvalue);
+
+  /* ppg-ir__agg_linear_trend__attr_"stderr"__chunk_len_5__f_agg_"max" */
+  _AggregateLinearTrend(data, data_length, 5u, 2u, NULL, &sterrest, NULL);
+  feats[6].fvalue = sterrest;
+  printf("ppg-ir__agg_linear_trend__attr_stderr__chunk_len_5__f_agg_max: %f\n", feats[6].fvalue);
+
+  /* ppg-ir__ar_0 */
+  float32_t* coefficients = _AutoRegression(data, data_length, 10u);
+  feats[7].fvalue = coefficients[0];
+  printf("ppg-ir__ar_0: %f\n", feats[7].fvalue);  
+
+  /* ppg-ir__lempel_ziv_complexity__bins_100 */
+  float32_t lempel_ziv_complexity = LempelZivComplexity(data, data_length, 100u);
+  feats[8].fvalue = lempel_ziv_complexity;
+  printf("ppg-ir__lempel_ziv_complexity__bins_100: %f\n", feats[8].fvalue); 
+
+  /* ppg-ir__number_peaks__n_1 */
+  num_peaks = _NumPeaks(data, data_length, 1u);
+  feats[9].fvalue = (float32_t)num_peaks;
+  printf("ppg-ir__number_peaks__n_1: %f\n", feats[9].fvalue);
+
+  /* ppg-ir__longest_strike_above_mean */
+  uint16_t longest_strike = LongestStrikeAboveMean(data, data_length);
+  feats[10].fvalue = (float32_t)longest_strike;
+  printf("ppg-ir__longest_strike_above_mean: %f\n", feats[10].fvalue);
 
   /* sort data. */
   float32_t* data_sorted = k_mem_pool;
@@ -608,15 +868,18 @@ static float _ExtractFeatsIR(float32_t* data, uint16_t data_length,
   // qsort(data_sorted, data_length, sizeof(float32_t), _CmpFunc);
   _SortFunc(data_sorted, data_length);
 
+  float32_t q_020 = _Quantile(data_sorted, data_length, 0.20);
   float32_t q_025 = _Quantile(data_sorted, data_length, 0.25);
+  float32_t q_040 = _Quantile(data_sorted, data_length, 0.40);
+  float32_t q_060 = _Quantile(data_sorted, data_length, 0.60);
   float32_t q_075 = _Quantile(data_sorted, data_length, 0.75);
   float32_t q_080 = _Quantile(data_sorted, data_length, 0.80);
   float32_t q_100 = data_sorted[data_length - 1];
 
   /* ppg__binned_entropy__max_bins_10 */
   float32_t binned_entropy = _BinnedEntropy(data_sorted, data_length, 10u);
-  feats[6].fvalue = binned_entropy;
-  printf("binned_entropy: %f\n", binned_entropy);
+  feats[11].fvalue = binned_entropy;
+  printf("binned_entropy: %f\n", feats[11].fvalue);
 
   /*
    * ppg__change_quantiles__f_agg_"var"__isabs_False__qh_1.0__ql_0.8
@@ -626,10 +889,18 @@ static float _ExtractFeatsIR(float32_t* data, uint16_t data_length,
       _ChangeQuantile(data, data_length, q_100, q_080, false, 1u);
   float32_t cq_true_080_100 =
       _ChangeQuantile(data, data_length, q_100, q_080, true, 1u);
-  feats[7].fvalue = cq_false_080_100;
-  feats[8].fvalue = cq_true_080_100;
-  printf("cq_false_080_100: %f\n", cq_false_080_100);
-  printf("cq_true_080_100: %f\n", cq_true_080_100);
+  float32_t cq_true_060_020 =
+      _ChangeQuantile(data, data_length, q_060, q_020, true, 0u);
+  float32_t cq_true_080_040 =
+      _ChangeQuantile(data, data_length, q_080, q_040, true, 0u);          
+  feats[12].fvalue = cq_false_080_100;
+  feats[13].fvalue = cq_true_080_100;
+  feats[14].fvalue = cq_true_060_020;
+  feats[15].fvalue = cq_true_080_040;
+  printf("cq_false_080_100: %f\n", feats[12].fvalue);
+  printf("cq_true_080_100: %f\n", feats[13].fvalue);
+  printf("cq_true_060_020: %f\n", feats[14].fvalue);
+  printf("cq_true_080_040: %f\n", feats[15].fvalue);
 
   /* 返回最大值, 用于基于最大值的判断条件. */
   float32_t maxVal = q_075 + 1.5 * (q_075 - q_025);
