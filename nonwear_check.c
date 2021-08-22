@@ -380,6 +380,49 @@ static float32_t _Quantile(const float32_t* data, uint32_t data_length,
 /*
  * TODO: 该函数与仿真结果有细微差异，需明确原因.
  */
+// static float32_t _BinnedEntropy(float32_t* data, uint16_t data_length,
+//                                 uint16_t max_bins) {
+//   float32_t min = data[0];
+//   float32_t max = data[data_length - 1u];
+
+//   float32_t bin_range = (max - min) / max_bins;
+//   float32_t bin;
+
+//   float32_t binned_entropy = 0.0;
+//   float32_t* p = data;
+//   uint16_t count = 0u;
+//   float32_t left_edge = min, right_edge = min + bin_range;
+
+//   while (p <= &data[data_length - 1]) {    
+//     if ((*p >= left_edge) && (*p < right_edge)) {
+//       // printf("left_edge: %f, right_edge: %f\n", left_edge, right_edge);
+//       count++;
+//       p++;
+//     } else {
+//       if (p == &data[data_length - 1]) {
+//         p++;  /*<< make sure to quit loop.  */
+//         count++;
+//       }
+//       // printf("count: %u\n", count);
+
+//       bin = (float32_t)count / (float32_t)data_length;
+//       if (bin == .0) {
+//         bin = 1.0;
+//       }
+//       binned_entropy -= (bin * logf(bin));
+      
+//       left_edge = right_edge;
+//       right_edge += bin_range;
+//       if (right_edge > max) {
+//         right_edge = max;
+//       }
+
+//       count = 0;
+//     }
+//   }
+
+//   return binned_entropy;
+// }
 static float32_t _BinnedEntropy(float32_t* data, uint16_t data_length,
                                 uint16_t max_bins) {
   float32_t min = data[0];
@@ -390,39 +433,31 @@ static float32_t _BinnedEntropy(float32_t* data, uint16_t data_length,
 
   float32_t binned_entropy = 0.0;
   float32_t* p = data;
-  uint16_t count = 0u;
-  float32_t left_edge = min, right_edge = min + bin_range;
+  uint16_t count = 1u;
+  float32_t bin_edge = min + bin_range;
 
-  while (p <= &data[data_length - 1]) {    
-    if ((*p >= left_edge) && (*p < right_edge)) {
-      // printf("left_edge: %f, right_edge: %f\n", left_edge, right_edge);
-      count++;
-      p++;
-    } else {
+  while (p++ < &data[data_length - 1]) {
+    if ((*p >= bin_edge) || (p == &data[data_length - 1])) {
+      /* the last bin include the right edge. */
       if (p == &data[data_length - 1]) {
-        p++;  /*<< make sure to quit loop.  */
-        count++;
+        count += 1u;
       }
-      // printf("count: %u\n", count);
-
       bin = (float32_t)count / (float32_t)data_length;
       if (bin == .0) {
         bin = 1.0;
       }
       binned_entropy -= (bin * logf(bin));
-      
-      left_edge = right_edge;
-      right_edge += bin_range;
-      if (right_edge > max) {
-        right_edge = max;
-      }
 
-      count = 0;
+      bin_edge += bin_range;
+      count = 1u;
+    } else {
+      count++;
     }
   }
 
   return binned_entropy;
 }
+
 
 static float32_t _RatioBeyondSigma(float32_t* data, uint16_t data_length,
                                    float32_t r) {
